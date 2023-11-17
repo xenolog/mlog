@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"path/filepath"
 	"runtime"
 	"sync"
 )
@@ -44,7 +45,7 @@ type MixedHandler struct {
 	out io.Writer
 }
 
-func New(out io.Writer, opts *HandlerOptions) *MixedHandler {
+func NewHandler(out io.Writer, opts *HandlerOptions) *MixedHandler {
 	h := &MixedHandler{out: out, mu: &sync.Mutex{}}
 	if opts != nil {
 		h.opts = *opts
@@ -73,7 +74,9 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 	if h.opts.AddSource && r.PC != 0 {
 		fs := runtime.CallersFrames([]uintptr{r.PC})
 		f, _ := fs.Next()
-		buf = fmt.Appendf(buf, "[%s:%d]  ", f.File, f.Line)
+		buf = fmt.Appendf(buf, "[%s:%d]  ", filepath.Base(f.File), f.Line)
+	} else {
+		buf = fmt.Appendf(buf, "--  ")
 	}
 
 	buf = append(buf, r.Message...)
