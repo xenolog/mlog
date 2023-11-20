@@ -344,3 +344,59 @@ func Test__Logger__With__DuplicateAttrsInTheDifferentGroup(t *testing.T) {
 
 	// tt.EqualValues(nativeWriter.String(), svWriter.String())
 }
+
+func Test__Logger__WithGroup(t *testing.T) {
+	tt := assert.New(t)
+
+	msg := "Info Message"
+
+	group1name := "firstGroup"
+	group2name := "secondGroup"
+
+	attr0key := "zzz"
+	attr0data := "ZZZ"
+	attr1key := "aaa"
+	attr1data := "aAa"
+	// attr2key := "bbb"
+	// attr2data := true
+	attr3key := "ccc"
+	attr3data := "CCC"
+
+	nativeWriter := NewTestWriter()
+	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
+	nativeLogger := slog.New(nativeHnldr).With(attr0key, attr0data).WithGroup(group1name).With(attr1key, attr1data).WithGroup(group2name)
+	nativeLogger.Info(msg, attr3key, attr3data)
+	nativeData := map[string]any{}
+	tt.NoError(json.Unmarshal(nativeWriter.Buf, &nativeData))
+
+	svWriter := NewTestWriter()
+	svHnldr := svLog.NewHandler(svWriter, &svLog.HandlerOptions{AddSource: true})
+	svLogger := slog.New(svHnldr).With(attr0key, attr0data).WithGroup(group1name).With(attr1key, attr1data).WithGroup(group2name)
+	svLogger.Info(msg, attr3key, attr3data)
+
+	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
+	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
+	// tt.Zero(string(jsonBuf))
+	svData := map[string]any{}
+	tt.NoError(json.Unmarshal(jsonBuf, &svData))
+
+	// nativeAttr1val, err := JqGet(nativeData, "."+attr1key)
+	// tt.NoError(err)
+	// svAttr1val, err := JqGet(svData, "."+attr1key)
+	// tt.NoError(err)
+	// tt.EqualValues(nativeAttr1val, svAttr1val)
+
+	// nativeAttr2val, err := JqGet(nativeData, "."+attr2key)
+	// tt.NoError(err)
+	// svAttr2val, err := JqGet(svData, "."+attr2key)
+	// tt.NoError(err)
+	// tt.EqualValues(nativeAttr2val, svAttr2val)
+
+	// nativeAttr3val, err := JqGet(nativeData, "."+attr3key)
+	// tt.NoError(err)
+	// svAttr3val, err := JqGet(svData, "."+attr3key)
+	// tt.NoError(err)
+	// tt.EqualValues(nativeAttr3val, svAttr3val)
+
+	tt.EqualValues(nativeWriter.String(), svWriter.String())
+}
