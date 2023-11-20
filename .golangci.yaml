@@ -1,6 +1,6 @@
 ---
 run:
-  go: "1.20"
+  go: "1.21"
   timeout: 5m
   skip-files:
     - "pkg/client/internalclientset/.*"
@@ -11,11 +11,11 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
   modules-download-mode: mod
-  exclude:
-    - '^shadow:\s+declaration\s+of\s+"err"\s+shadows\s+declaration\s+at\s+line'
-    - '^shadow:\s+declaration\s+of\s+"ok"\s+shadows\s+declaration\s+at\s+line'
-    - '^shadow:\s+declaration\s+of\s+"ctx"\s+shadows\s+declaration\s+at\s+line'
-    - '^shadow:\s+declaration\s+of\s+"tt"\s+shadows\s+declaration\s+at\s+line'
+  # exclude:
+  #   - '^shadow:\s+declaration\s+of\s+"err"\s+shadows\s+declaration\s+at\s+line'
+  #   - '^shadow:\s+declaration\s+of\s+"ok"\s+shadows\s+declaration\s+at\s+line'
+  #   - '^shadow:\s+declaration\s+of\s+"ctx"\s+shadows\s+declaration\s+at\s+line'
+  #   - '^shadow:\s+declaration\s+of\s+"tt"\s+shadows\s+declaration\s+at\s+line'
   exclude-rules:
     - linters: [stylecheck]
       text: "ST1003:"
@@ -47,6 +47,8 @@ issues:
     - linters: [revive]
       text: "^confusing-naming: Method '[Rr]econcile' differs only by capitalization"
       path: fake-.+\.go
+    - linters: [revive]
+      text: "^import-alias-naming:"
     - linters: [wsl]
       text: "if statements should only be cuddled with assignments"
     - linters: [wsl]
@@ -62,6 +64,9 @@ issues:
       text: '^directive\s+`//\s+nolint:\s+[A-Za-z0-9]+`\s+should\s+be\s+written\s+without\s+leading\s+space'
     - linters: [musttag]
       source: "type GroupVersionKind struct {"
+#    - linters: [depguard]
+#      # text: "import-alias-naming:"
+#      text: ""
 linters:
   enable-all: true
   disable:
@@ -221,4 +226,25 @@ linters-settings:
     # Ignore missing calls to `t.Parallel()` and only report incorrect uses of it.
     # Default: false
     ignore-missing: true
+  depguard:
+    rules:
+      main:
+        # list-mode: lax
+        files:
+          - $all
+          - "!$test"
+        allow:
+          - $gostd
+        # deny:
+        # reflect: Please don't use reflect package
+      test:
+        files:
+          - $test
+        allow:
+          - $gostd
+          - github.com/xenolog/slog
+          - github.com/stretchr/testify
+          - github.com/itchyny/gojq
+        # deny:
+        # reflect: Please don't use reflect package
 ###
