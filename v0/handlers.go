@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ const (
 	TimeInputFormatRFC3339  = "2006-01-02T15:04:05.99999Z07"
 	TimeOutputFormatRFC3339 = "2006-01-02T15:04:05.00000Z07"
 	LogLineBuffSize         = 1024
+	AttrsJSONprefix         = "ATTRS="
 )
 
 var level2Letter = map[slog.Level]string{ //nolint:gochecknoglobals
@@ -81,7 +83,20 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 
 	buf = append(buf, r.Message...)
 
-	// attrs := map[string]any //
+	attrs := map[string]any{}
+	r.Attrs(func(a slog.Attr) bool {
+		attrs[a.Key] = a.Value.Any()
+		return true
+	})
+	if len(attrs) != 0 {
+		attrsJSON, err := json.Marshal(attrs)
+		if err != nil {
+			buf = append(buf, "slogERR: "+err.Error()...)
+		} else {
+			buf = append(buf, "  "+AttrsJSONprefix...)
+			buf = append(buf, attrsJSON...)
+		}
+	}
 
 	buf = append(buf, "\n"...)
 	h.mu.Lock()

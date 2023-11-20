@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"log/slog"
 	"strings"
@@ -21,8 +22,7 @@ func Test__Handler__Simple(t *testing.T) {
 	nativeLogger.Info(msg)
 
 	nativeData := map[string]any{}
-	err := json.Unmarshal(nativeWriter.Buf, &nativeData)
-	tt.NoError(err)
+	tt.NoError(json.Unmarshal(nativeWriter.Buf, &nativeData))
 	nativeTimeStr := JqGetString(nativeData, ".time")
 	tt.NotEqualValues("", nativeTimeStr)
 	nativeTime, err := time.Parse(time.RFC3339Nano, nativeTimeStr)
@@ -31,7 +31,7 @@ func Test__Handler__Simple(t *testing.T) {
 	svWriter := NewTestWriter()
 	svLogger := slog.New(svLog.NewHandler(svWriter, &svLog.HandlerOptions{AddSource: true}))
 	svLogger.Info(msg)
-	svLogLineSplitted := strings.Split(string(svWriter.Buf), " ")
+	svLogLineSplitted := strings.Fields(string(svWriter.Buf))
 	tt.Greater(len(svLogLineSplitted), 2)
 	svTime, err := time.Parse(time.RFC3339Nano, svLogLineSplitted[0])
 	tt.NoError(err)
@@ -44,6 +44,79 @@ func Test__Handler__Simple(t *testing.T) {
 
 	sourceLineSplited := strings.Split(strings.Trim(svLogLineSplitted[2], "[]"), ":")
 	tt.EqualValues("handlers__test.go", sourceLineSplited[0])
+
+	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+}
+
+func Test__Handler__Values(t *testing.T) {
+	tt := assert.New(t)
+
+	msg := "see values"
+
+	valKeyInt := "intVal"
+	valDataInt := 42 //nolint:revive
+
+	valKeyBool := "boolVal"
+	valDataBool := true
+
+	valKeyString := "stringVal"
+	valDataString := "a string"
+
+	valKeyTime := "timeVal"
+	valDataTime := time.Now()
+
+	nativeWriter := NewTestWriter()
+	nativeLogger := slog.New(slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true}))
+	nativeLogger.Info(msg,
+		valKeyInt, valDataInt,
+		valKeyBool, valDataBool,
+		valKeyString, valDataString,
+		valKeyTime, valDataTime,
+	)
+	nativeData := map[string]any{}
+	tt.NoError(json.Unmarshal(nativeWriter.Buf, &nativeData))
+
+	svWriter := NewTestWriter()
+	svLogger := slog.New(svLog.NewHandler(svWriter, &svLog.HandlerOptions{AddSource: true}))
+	svLogger.Info(msg,
+		valKeyInt, valDataInt,
+		valKeyBool, valDataBool,
+		valKeyString, valDataString,
+		valKeyTime, valDataTime,
+	)
+	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
+	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
+	// tt.Zero(string(jsonBuf))
+	svData := map[string]any{}
+	tt.NoError(json.Unmarshal(jsonBuf, &svData))
+
+	nativeBoolVal, err := JqGet(nativeData, "."+valKeyBool)
+	tt.NoError(err)
+	svBoolVal, err := JqGet(svData, "."+valKeyBool)
+	tt.NoError(err)
+	tt.EqualValues(valDataBool, svBoolVal)
+	tt.EqualValues(nativeBoolVal, svBoolVal)
+
+	nativeIntVal, err := JqGet(nativeData, "."+valKeyInt)
+	tt.NoError(err)
+	svIntVal, err := JqGet(svData, "."+valKeyInt)
+	tt.NoError(err)
+	tt.EqualValues(valDataInt, svIntVal)
+	tt.EqualValues(nativeIntVal, svIntVal)
+
+	nativeStringVal, err := JqGet(nativeData, "."+valKeyString)
+	tt.NoError(err)
+	svStringVal, err := JqGet(svData, "."+valKeyString)
+	tt.NoError(err)
+	tt.EqualValues(valDataString, svStringVal)
+	tt.EqualValues(nativeStringVal, svStringVal)
+
+	nativeTimeVal, err := JqGet(nativeData, "."+valKeyTime)
+	tt.NoError(err)
+	svTimeVal, err := JqGet(svData, "."+valKeyTime)
+	tt.NoError(err)
+	tt.EqualValues(valDataTime.Format(time.RFC3339Nano), svTimeVal)
+	tt.EqualValues(nativeTimeVal, svTimeVal)
 
 	// tt.EqualValues(nativeWriter.String(), svWriter.String())
 }
