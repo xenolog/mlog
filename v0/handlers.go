@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -49,8 +50,9 @@ type MixedHandler struct {
 
 func NewHandler(out io.Writer, opts *HandlerOptions) *MixedHandler {
 	h := &MixedHandler{
-		out: out,
-		mu:  &sync.Mutex{},
+		out:               out,
+		mu:                &sync.Mutex{},
+		preCollectedAttrs: map[string]any{},
 	}
 	if opts != nil {
 		h.opts = *opts
@@ -86,16 +88,11 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 
 	buf = append(buf, r.Message...)
 
-	attrs := map[string]any{}
+	attrs := maps.Clone(h.preCollectedAttrs)
 	r.Attrs(func(a slog.Attr) bool {
 		attrs[a.Key] = a.Value.Any()
 		return true
 	})
-	if len(h.preCollectedAttrs) != 0 {
-		for k := range h.preCollectedAttrs {
-			attrs[k] = h.preCollectedAttrs[k]
-		}
-	}
 	if len(attrs) != 0 {
 		attrsJSON, err := json.Marshal(attrs)
 		if err != nil {
@@ -121,7 +118,7 @@ func (h *MixedHandler) WithAttrs(aa []slog.Attr) slog.Handler {
 		opts:              h.opts,
 		out:               h.out,
 		mu:                h.mu,
-		preCollectedAttrs: map[string]any{},
+		preCollectedAttrs: h.preCollectedAttrs,
 	}
 	for k := range aa {
 		hh.preCollectedAttrs[aa[k].Key] = aa[k].Value.Any()
