@@ -48,7 +48,10 @@ type MixedHandler struct {
 }
 
 func NewHandler(out io.Writer, opts *HandlerOptions) *MixedHandler {
-	h := &MixedHandler{out: out, mu: &sync.Mutex{}}
+	h := &MixedHandler{
+		out: out,
+		mu:  &sync.Mutex{},
+	}
 	if opts != nil {
 		h.opts = *opts
 	}
@@ -88,6 +91,11 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 		attrs[a.Key] = a.Value.Any()
 		return true
 	})
+	if len(h.preCollectedAttrs) != 0 {
+		for k := range h.preCollectedAttrs {
+			attrs[k] = h.preCollectedAttrs[k]
+		}
+	}
 	if len(attrs) != 0 {
 		attrsJSON, err := json.Marshal(attrs)
 		if err != nil {
@@ -109,8 +117,17 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 }
 
 func (h *MixedHandler) WithAttrs(aa []slog.Attr) slog.Handler {
-	// TODO: investigate and implement WithAttrs functionality
-	return h
+	hh := &MixedHandler{
+		opts:              h.opts,
+		out:               h.out,
+		mu:                h.mu,
+		preCollectedAttrs: map[string]any{},
+	}
+	for k := range aa {
+		hh.preCollectedAttrs[aa[k].Key] = aa[k].Value.Any()
+	}
+
+	return hh
 }
 
 func (h *MixedHandler) WithGroup(name string) slog.Handler {

@@ -151,3 +151,57 @@ func Test__Handler__Values(t *testing.T) {
 
 	// tt.EqualValues(nativeWriter.String(), svWriter.String())
 }
+
+func Test__Handler__WithAttrs(t *testing.T) {
+	tt := assert.New(t)
+
+	msg := "Info Message"
+
+	attr1key := "aaa"
+	attr1data := "aAa"
+	attr2key := "bbb"
+	attr2data := true
+	attr3key := "ccc"
+	attr3data := "CCC"
+
+	attr1 := slog.Attr{Key: attr1key, Value: slog.StringValue(attr1data)}
+	attr2 := slog.Attr{Key: attr2key, Value: slog.BoolValue(attr2data)}
+
+	nativeWriter := NewTestWriter()
+	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true}).WithAttrs([]slog.Attr{attr1, attr2})
+	nativeLogger := slog.New(nativeHnldr)
+	nativeLogger.Info(msg, attr3key, attr3data)
+	nativeData := map[string]any{}
+	tt.NoError(json.Unmarshal(nativeWriter.Buf, &nativeData))
+
+	svWriter := NewTestWriter()
+	svHnldr := svLog.NewHandler(svWriter, &svLog.HandlerOptions{AddSource: true}).WithAttrs([]slog.Attr{attr1, attr2})
+	svLogger := slog.New(svHnldr)
+	svLogger.Info(msg, attr3key, attr3data)
+
+	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
+	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
+	// tt.Zero(string(jsonBuf))
+	svData := map[string]any{}
+	tt.NoError(json.Unmarshal(jsonBuf, &svData))
+
+	nativeAttr1val, err := JqGet(nativeData, "."+attr1key)
+	tt.NoError(err)
+	svAttr1val, err := JqGet(svData, "."+attr1key)
+	tt.NoError(err)
+	tt.EqualValues(nativeAttr1val, svAttr1val)
+
+	nativeAttr2val, err := JqGet(nativeData, "."+attr2key)
+	tt.NoError(err)
+	svAttr2val, err := JqGet(svData, "."+attr2key)
+	tt.NoError(err)
+	tt.EqualValues(nativeAttr2val, svAttr2val)
+
+	nativeAttr3val, err := JqGet(nativeData, "."+attr3key)
+	tt.NoError(err)
+	svAttr3val, err := JqGet(svData, "."+attr3key)
+	tt.NoError(err)
+	tt.EqualValues(nativeAttr3val, svAttr3val)
+
+	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+}
