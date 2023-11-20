@@ -45,6 +45,37 @@ func Test__Handler__Simple(t *testing.T) {
 	sourceLineSplited := strings.Split(strings.Trim(svLogLineSplitted[2], "[]"), ":")
 	tt.EqualValues("handlers__test.go", sourceLineSplited[0])
 
+	tt.EqualValues(msg, strings.Join(svLogLineSplitted[3:], " "))
+
+	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+}
+
+func Test__Handler__InterceptSimpleLogger(t *testing.T) {
+	tt := assert.New(t)
+	msg := "Just InfoMessage"
+
+	svWriter := NewTestWriter()
+	hnldr := svLog.NewHandler(svWriter, &svLog.HandlerOptions{AddSource: true})
+	slog.New(hnldr)
+	stdLog := slog.NewLogLogger(hnldr, slog.LevelInfo)
+	now := time.Now()
+	stdLog.Print(msg)
+
+	svLogLineSplitted := strings.Fields(string(svWriter.Buf))
+	tt.Greater(len(svLogLineSplitted), 2)
+	svTime, err := time.Parse(time.RFC3339Nano, svLogLineSplitted[0])
+	tt.NoError(err)
+
+	timeDelta := svTime.Sub(now)
+	tt.Zero(timeDelta.Truncate(time.Second)) // I suppose delta between 2 log lines less than 1 second
+
+	tt.EqualValues("I", svLogLineSplitted[1])
+
+	sourceLineSplited := strings.Split(strings.Trim(svLogLineSplitted[2], "[]"), ":")
+	tt.EqualValues("handlers__test.go", sourceLineSplited[0])
+
+	tt.EqualValues(msg, strings.Join(svLogLineSplitted[3:], " "))
+
 	// tt.EqualValues(nativeWriter.String(), svWriter.String())
 }
 
