@@ -8,14 +8,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	assert "github.com/stretchr/testify/require"
 	svLog "github.com/xenolog/slog/v0"
+)
+
+const (
+	attr0key = "zzz"
+	attr1key = "aaa"
+	attr2key = "bbb"
+	attr3key = "ccc"
 )
 
 // -----------------------------------------------------------------------------
 func Test__Handler__Simple(t *testing.T) {
 	tt := assert.New(t)
-	msg := "Just InfoMessage"
+	msg := "Just InfoMessage " + uuid.NewString()
 
 	nativeWriter := NewTestWriter()
 	nativeLogger := slog.New(slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true}))
@@ -47,12 +55,12 @@ func Test__Handler__Simple(t *testing.T) {
 
 	tt.EqualValues(msg, strings.Join(svLogLineSplitted[3:], " "))
 
-	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+	// tt.EqualValues(nativeWriter.String(), svWriter.String()) // enable if deep debug required
 }
 
 func Test__Handler__InterceptSimpleLogger(t *testing.T) {
 	tt := assert.New(t)
-	msg := "Just InfoMessage"
+	msg := "Just InfoMessage " + uuid.NewString()
 
 	svWriter := NewTestWriter()
 	hnldr := svLog.NewHandler(svWriter, &svLog.HandlerOptions{AddSource: true})
@@ -76,16 +84,16 @@ func Test__Handler__InterceptSimpleLogger(t *testing.T) {
 
 	tt.EqualValues(msg, strings.Join(svLogLineSplitted[3:], " "))
 
-	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+	// tt.EqualValues(nativeWriter.String(), svWriter.String()) // enable if deep debug required
 }
 
 func Test__Handler__Values(t *testing.T) {
 	tt := assert.New(t)
 
-	msg := "see values"
+	msg := "see values of " + uuid.NewString()
 
 	valKeyInt := "intVal"
-	valDataInt := 42 //nolint:revive
+	valDataInt := 42 //revive:disable:add-constant
 
 	valKeyBool := "boolVal"
 	valDataBool := true
@@ -117,7 +125,7 @@ func Test__Handler__Values(t *testing.T) {
 	)
 	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
 	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
-	// tt.Zero(string(jsonBuf))
+	// tt.Zero(string(jsonBuf)) // enable if deep debug required
 	svData := map[string]any{}
 	tt.NoError(json.Unmarshal(jsonBuf, &svData))
 
@@ -149,20 +157,17 @@ func Test__Handler__Values(t *testing.T) {
 	tt.EqualValues(valDataTime.Format(time.RFC3339Nano), svTimeVal)
 	tt.EqualValues(nativeTimeVal, svTimeVal)
 
-	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+	// tt.EqualValues(nativeWriter.String(), svWriter.String()) // enable if deep debug required
 }
 
 func Test__Handler__WithAttrs(t *testing.T) {
 	tt := assert.New(t)
 
-	msg := "Info Message"
+	msg := "Info Message" + uuid.NewString()
 
-	attr1key := "aaa"
-	attr1data := "aAa"
-	attr2key := "bbb"
+	attr1data := uuid.NewString()
 	attr2data := true
-	attr3key := "ccc"
-	attr3data := "CCC"
+	attr3data := uuid.NewString()
 
 	attr1 := slog.Attr{Key: attr1key, Value: slog.StringValue(attr1data)}
 	attr2 := slog.Attr{Key: attr2key, Value: slog.BoolValue(attr2data)}
@@ -181,7 +186,7 @@ func Test__Handler__WithAttrs(t *testing.T) {
 
 	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
 	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
-	// tt.Zero(string(jsonBuf))
+	// tt.Zero(string(jsonBuf)) // enable if deep debug required
 	svData := map[string]any{}
 	tt.NoError(json.Unmarshal(jsonBuf, &svData))
 
@@ -203,20 +208,17 @@ func Test__Handler__WithAttrs(t *testing.T) {
 	tt.NoError(err)
 	tt.EqualValues(nativeAttr3val, svAttr3val)
 
-	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+	// tt.EqualValues(nativeWriter.String(), svWriter.String()) // enable if deep debug required
 }
 
 func Test__Logger__With(t *testing.T) {
 	tt := assert.New(t)
 
-	msg := "Info Message"
+	msg := "Info Message " + uuid.NewString() //nolint:goconst
 
-	attr1key := "aaa"
-	attr1data := "aAa"
-	attr2key := "bbb"
+	attr1data := uuid.NewString()
 	attr2data := true
-	attr3key := "ccc"
-	attr3data := "CCC"
+	attr3data := uuid.NewString()
 
 	nativeWriter := NewTestWriter()
 	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
@@ -232,7 +234,7 @@ func Test__Logger__With(t *testing.T) {
 
 	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
 	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
-	// tt.Zero(string(jsonBuf))
+	// tt.Zero(string(jsonBuf)) // enable if deep debug required
 	svData := map[string]any{}
 	tt.NoError(json.Unmarshal(jsonBuf, &svData))
 
@@ -254,19 +256,17 @@ func Test__Logger__With(t *testing.T) {
 	tt.NoError(err)
 	tt.EqualValues(nativeAttr3val, svAttr3val)
 
-	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+	// tt.EqualValues(nativeWriter.String(), svWriter.String()) // enable if deep debug required
 }
 
 func Test__Logger__With__DuplicateAttrs(t *testing.T) {
 	tt := assert.New(t)
 
-	msg := "Info Message"
+	msg := "Info Message " + uuid.NewString()
 
-	attr1key := "aaa"
-	attr1data := "aAa"
-	attr2key := "bbb"
-	attr2data := "bBb"
-	attr3data := "CCC"
+	attr1data := uuid.NewString()
+	attr2data := uuid.NewString()
+	attr3data := uuid.NewString()
 
 	nativeWriter := NewTestWriter()
 	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
@@ -282,7 +282,7 @@ func Test__Logger__With__DuplicateAttrs(t *testing.T) {
 
 	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
 	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
-	// tt.Zero(string(jsonBuf))
+	// tt.Zero(string(jsonBuf)) // enable if deep debug required
 	svData := map[string]any{}
 	tt.NoError(json.Unmarshal(jsonBuf, &svData))
 
@@ -298,19 +298,17 @@ func Test__Logger__With__DuplicateAttrs(t *testing.T) {
 	tt.NoError(err)
 	tt.EqualValues(nativeAttr2val, svAttr2val)
 
-	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+	// tt.EqualValues(nativeWriter.String(), svWriter.String()) // enable if deep debug required
 }
 
 func Test__Logger__With__DuplicateAttrsInTheDifferentGroup(t *testing.T) {
 	tt := assert.New(t)
 
-	msg := "Info Message"
+	msg := "Info Message " + uuid.NewString()
 
-	attr1key := "aaa"
-	attr1data := "aAa"
-	attr2key := "bbb"
-	attr2data := "bBb"
-	attr3data := "CCC"
+	attr1data := uuid.NewString()
+	attr2data := uuid.NewString()
+	attr3data := uuid.NewString()
 
 	nativeWriter := NewTestWriter()
 	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
@@ -326,7 +324,7 @@ func Test__Logger__With__DuplicateAttrsInTheDifferentGroup(t *testing.T) {
 
 	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
 	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
-	// tt.Zero(string(jsonBuf))
+	// tt.Zero(string(jsonBuf)) // enable if deep debug required
 	svData := map[string]any{}
 	tt.NoError(json.Unmarshal(jsonBuf, &svData))
 
@@ -342,61 +340,56 @@ func Test__Logger__With__DuplicateAttrsInTheDifferentGroup(t *testing.T) {
 	tt.NoError(err)
 	tt.EqualValues(nativeAttr2val, svAttr2val)
 
-	// tt.EqualValues(nativeWriter.String(), svWriter.String())
+	// tt.EqualValues(nativeWriter.String(), svWriter.String()) // enable if deep debug required
 }
 
 func Test__Logger__WithGroup(t *testing.T) {
 	tt := assert.New(t)
 
-	msg := "Info Message"
+	msg := "Info Message " + uuid.NewString()
 
 	group1name := "firstGroup"
 	group2name := "secondGroup"
 
-	attr0key := "zzz"
-	attr0data := "ZZZ"
-	attr1key := "aaa"
-	attr1data := "aAa"
-	// attr2key := "bbb"
-	// attr2data := true
-	attr3key := "ccc"
-	attr3data := "CCC"
+	attr0data := uuid.NewString() + "-0"
+	attr1data := uuid.NewString() + "-1"
+	attr2data := uuid.NewString() + "-2"
 
 	nativeWriter := NewTestWriter()
 	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
 	nativeLogger := slog.New(nativeHnldr).With(attr0key, attr0data).WithGroup(group1name).With(attr1key, attr1data).WithGroup(group2name)
-	nativeLogger.Info(msg, attr3key, attr3data)
+	nativeLogger.Info(msg, attr2key, attr2data)
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Buf, &nativeData))
 
 	svWriter := NewTestWriter()
 	svHnldr := svLog.NewHandler(svWriter, &svLog.HandlerOptions{AddSource: true})
 	svLogger := slog.New(svHnldr).With(attr0key, attr0data).WithGroup(group1name).With(attr1key, attr1data).WithGroup(group2name)
-	svLogger.Info(msg, attr3key, attr3data)
+	svLogger.Info(msg, attr2key, attr2data)
 
 	pos := bytes.Index(svWriter.Buf, []byte(svLog.AttrsJSONprefix))
 	jsonBuf := svWriter.Buf[pos+len(svLog.AttrsJSONprefix):]
-	// tt.Zero(string(jsonBuf))
+	// tt.Zero(string(jsonBuf)) // enable if deep debug required
 	svData := map[string]any{}
 	tt.NoError(json.Unmarshal(jsonBuf, &svData))
 
-	// nativeAttr1val, err := JqGet(nativeData, "."+attr1key)
-	// tt.NoError(err)
-	// svAttr1val, err := JqGet(svData, "."+attr1key)
-	// tt.NoError(err)
-	// tt.EqualValues(nativeAttr1val, svAttr1val)
+	nativeAttr0val, err := JqGet(nativeData, "."+attr0key)
+	tt.NoError(err)
+	svAttr0val, err := JqGet(svData, "."+attr0key)
+	tt.NoError(err)
+	tt.EqualValues(nativeAttr0val, svAttr0val)
 
-	// nativeAttr2val, err := JqGet(nativeData, "."+attr2key)
-	// tt.NoError(err)
-	// svAttr2val, err := JqGet(svData, "."+attr2key)
-	// tt.NoError(err)
-	// tt.EqualValues(nativeAttr2val, svAttr2val)
+	nativeAttr1val, err := JqGet(nativeData, "."+group1name+"."+attr1key)
+	tt.NoError(err)
+	svAttr1val, err := JqGet(svData, "."+group1name+"."+attr1key)
+	tt.NoError(err)
+	tt.EqualValues(nativeAttr1val, svAttr1val)
 
-	// nativeAttr3val, err := JqGet(nativeData, "."+attr3key)
-	// tt.NoError(err)
-	// svAttr3val, err := JqGet(svData, "."+attr3key)
-	// tt.NoError(err)
-	// tt.EqualValues(nativeAttr3val, svAttr3val)
+	nativeAttr2val, err := JqGet(nativeData, "."+group1name+"."+group2name+"."+attr2key)
+	tt.NoError(err)
+	svAttr2val, err := JqGet(svData, "."+group1name+"."+group2name+"."+attr2key)
+	tt.NoError(err)
+	tt.EqualValues(nativeAttr2val, svAttr2val)
 
-	tt.EqualValues(nativeWriter.String(), svWriter.String())
+	// tt.EqualValues(nativeWriter.String(), svWriter.String()) // enable if deep debug required
 }

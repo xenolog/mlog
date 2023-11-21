@@ -111,11 +111,23 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 
 	buf = append(buf, r.Message...)
 
-	attrs := maps.Clone(h.groups[len(h.groups)-1].attrs)
+	attrs := jsonTree{}
+	ptr := attrs // pointer to group (or tree root) to store record attributes
+	for i := range h.groups {
+		if h.groups[i].name != "" {
+			ptr[h.groups[i].name] = jsonTree{}
+			ptr = ptr[h.groups[i].name].(jsonTree) //revive:disable:unchecked-type-assertion // because created with right type in the previous line
+		}
+		maps.Copy(ptr, h.groups[i].attrs)
+	}
+
+	// fill Attrs from records
 	r.Attrs(func(a slog.Attr) bool {
-		attrs[a.Key] = a.Value.Any()
+		ptr[a.Key] = a.Value.Any()
 		return true
 	})
+
+	// serialize and store JSON into buffer
 	if len(attrs) != 0 {
 		attrsJSON, err := json.Marshal(attrs)
 		if err != nil {
@@ -146,11 +158,15 @@ func (h *MixedHandler) WithAttrs(aa []slog.Attr) slog.Handler {
 }
 
 func (h *MixedHandler) WithGroup(name string) slog.Handler {
-	hh := h.Copy()
-	hh.groups = append(hh.groups, group{
-		name:  name,
-		attrs: jsonTree{},
-	})
-	// idx := len(hh.groups) - 1
-	return h
+	var hh *MixedHandler
+	if name != "" {
+		hh = h.Copy()
+		hh.groups = append(hh.groups, group{
+			name:  name,
+			attrs: jsonTree{},
+		})
+	} else {
+		hh = h
+	}
+	return hh
 }
