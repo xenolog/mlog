@@ -27,6 +27,13 @@ var level2Letter = map[slog.Level]string{ //nolint:gochecknoglobals
 	slog.LevelError: " E ",
 }
 
+type jsonTree map[string]any
+
+type group struct {
+	name  string
+	attrs jsonTree
+}
+
 type HandlerOptions struct {
 	// AddSource causes the handler to compute the source code position
 	// of the log statement and add a SourceKey attribute to the output.
@@ -41,8 +48,8 @@ type HandlerOptions struct {
 }
 
 type MixedHandler struct {
-	opts              HandlerOptions
-	preCollectedAttrs map[string]any
+	opts   HandlerOptions
+	groups []group
 	// TODO: state for WithGroup and WithAttrs
 	mu  *sync.Mutex
 	out io.Writer
@@ -50,9 +57,11 @@ type MixedHandler struct {
 
 func NewHandler(out io.Writer, opts *HandlerOptions) *MixedHandler {
 	h := &MixedHandler{
-		out:               out,
-		mu:                &sync.Mutex{},
-		preCollectedAttrs: map[string]any{},
+		out: out,
+		mu:  &sync.Mutex{},
+		groups: []group{{ // group[0] always exists, has no name and used
+			attrs: jsonTree{}, // to store non-groupped attrs
+		}},
 	}
 	if opts != nil {
 		h.opts = *opts
@@ -61,6 +70,20 @@ func NewHandler(out io.Writer, opts *HandlerOptions) *MixedHandler {
 		h.opts.Level = slog.LevelInfo
 	}
 	return h
+}
+
+func (h *MixedHandler) Copy() *MixedHandler {
+	rv := &MixedHandler{
+		opts:   h.opts,
+		out:    h.out,
+		mu:     h.mu,
+		groups: make([]group, len(h.groups)),
+	}
+	for i := range h.groups {
+		rv.groups[i].name = h.groups[i].name
+		rv.groups[i].attrs = maps.Clone(h.groups[i].attrs)
+	}
+	return rv
 }
 
 func (h *MixedHandler) Enabled(_ context.Context, level slog.Level) bool {
@@ -88,7 +111,7 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 
 	buf = append(buf, r.Message...)
 
-	attrs := maps.Clone(h.preCollectedAttrs)
+	attrs := maps.Clone(h.groups[len(h.groups)-1].attrs)
 	r.Attrs(func(a slog.Attr) bool {
 		attrs[a.Key] = a.Value.Any()
 		return true
@@ -114,20 +137,20 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 }
 
 func (h *MixedHandler) WithAttrs(aa []slog.Attr) slog.Handler {
-	hh := &MixedHandler{
-		opts:              h.opts,
-		out:               h.out,
-		mu:                h.mu,
-		preCollectedAttrs: h.preCollectedAttrs,
-	}
+	hh := h.Copy()
+	idx := len(hh.groups) - 1
 	for k := range aa {
-		hh.preCollectedAttrs[aa[k].Key] = aa[k].Value.Any()
+		hh.groups[idx].attrs[aa[k].Key] = aa[k].Value.Any()
 	}
-
 	return hh
 }
 
 func (h *MixedHandler) WithGroup(name string) slog.Handler {
-	// TODO: investigate and implement WithGroup functionality
+	hh := h.Copy()
+	hh.groups = append(hh.groups, group{
+		name:  name,
+		attrs: jsonTree{},
+	})
+	// idx := len(hh.groups) - 1
 	return h
 }
