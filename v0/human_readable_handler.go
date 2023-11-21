@@ -33,7 +33,7 @@ type HandlerOptions struct {
 	Level slog.Leveler
 }
 
-type MixedHandler struct {
+type HumanReadableHandler struct {
 	opts   HandlerOptions
 	groups []group
 	// TODO: state for WithGroup and WithAttrs
@@ -41,8 +41,8 @@ type MixedHandler struct {
 	out io.Writer
 }
 
-func NewHandler(out io.Writer, opts *HandlerOptions) *MixedHandler {
-	h := &MixedHandler{
+func NewHandler(out io.Writer, opts *HandlerOptions) *HumanReadableHandler {
+	h := &HumanReadableHandler{
 		out: out,
 		mu:  &sync.Mutex{},
 		groups: []group{{ // group[0] always exists, has no name and used
@@ -58,8 +58,8 @@ func NewHandler(out io.Writer, opts *HandlerOptions) *MixedHandler {
 	return h
 }
 
-func (h *MixedHandler) Copy() *MixedHandler {
-	rv := &MixedHandler{
+func (h *HumanReadableHandler) Copy() *HumanReadableHandler {
+	rv := &HumanReadableHandler{
 		opts:   h.opts,
 		out:    h.out,
 		mu:     h.mu,
@@ -72,11 +72,11 @@ func (h *MixedHandler) Copy() *MixedHandler {
 	return rv
 }
 
-func (h *MixedHandler) Enabled(_ context.Context, level slog.Level) bool {
+func (h *HumanReadableHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.opts.Level.Level()
 }
 
-func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint:gocritic
+func (h *HumanReadableHandler) Handle(_ context.Context, r slog.Record) error { //nolint:gocritic
 	buf := make([]byte, 0, LogLineBuffSize)
 	if !r.Time.IsZero() {
 		if h.opts.UseLocalTZ {
@@ -134,7 +134,7 @@ func (h *MixedHandler) Handle(_ context.Context, r slog.Record) error { //nolint
 	return err
 }
 
-func (h *MixedHandler) WithAttrs(aa []slog.Attr) slog.Handler {
+func (h *HumanReadableHandler) WithAttrs(aa []slog.Attr) slog.Handler {
 	hh := h.Copy()
 	idx := len(hh.groups) - 1
 	for k := range aa {
@@ -143,8 +143,8 @@ func (h *MixedHandler) WithAttrs(aa []slog.Attr) slog.Handler {
 	return hh
 }
 
-func (h *MixedHandler) WithGroup(name string) slog.Handler {
-	var hh *MixedHandler
+func (h *HumanReadableHandler) WithGroup(name string) slog.Handler {
+	var hh *HumanReadableHandler
 	if name != "" {
 		hh = h.Copy()
 		hh.groups = append(hh.groups, group{

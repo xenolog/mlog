@@ -51,7 +51,7 @@ func Test__Handler__Simple(t *testing.T) {
 	tt.EqualValues("I", svLogLineSplitted[1])
 
 	sourceLineSplited := strings.Split(strings.Trim(svLogLineSplitted[2], "[]"), ":")
-	tt.EqualValues("handlers__test.go", sourceLineSplited[0])
+	tt.EqualValues("human_readable_handler__test.go", sourceLineSplited[0])
 
 	tt.EqualValues(msg, strings.Join(svLogLineSplitted[3:], " "))
 
@@ -80,7 +80,7 @@ func Test__Handler__InterceptSimpleLogger(t *testing.T) {
 	tt.EqualValues("I", svLogLineSplitted[1])
 
 	sourceLineSplited := strings.Split(strings.Trim(svLogLineSplitted[2], "[]"), ":")
-	tt.EqualValues("handlers__test.go", sourceLineSplited[0])
+	tt.EqualValues("human_readable_handler__test.go", sourceLineSplited[0])
 
 	tt.EqualValues(msg, strings.Join(svLogLineSplitted[3:], " "))
 
