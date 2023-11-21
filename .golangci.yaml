@@ -77,6 +77,7 @@ linters:
     - errname
     - exhaustivestruct # is deprecated (since v1.46.0) due to: The owner seems to have abandoned the linter.  Replaced by exhaustruct.
     - exhaustruct
+    - forcetypeassert # the same check exists in revive
     - funlen
     - gocognit
     - godot
@@ -245,6 +246,7 @@ linters-settings:
           - github.com/xenolog/slog
           - github.com/stretchr/testify
           - github.com/itchyny/gojq
+          - github.com/google/uuid
         # deny:
         # reflect: Please don't use reflect package
 ###
