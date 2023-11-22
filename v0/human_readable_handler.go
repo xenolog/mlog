@@ -58,6 +58,8 @@ func NewHumanReadableHandler(out io.Writer, opts *HumanReadableHandlerOptions) *
 }
 
 func (h *HumanReadableHandler) Copy() *HumanReadableHandler {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	rv := &HumanReadableHandler{
 		opts:   h.opts,
 		out:    h.out,
