@@ -236,6 +236,7 @@ linters-settings:
           - "!$test"
         allow:
           - $gostd
+          - github.com/xenolog/mlog
         # deny:
         # reflect: Please don't use reflect package
       test:
@@ -243,7 +244,6 @@ linters-settings:
           - $test
         allow:
           - $gostd
-          - github.com/xenolog/slog
           - github.com/xenolog/mlog
           - github.com/stretchr/testify
           - github.com/itchyny/gojq
