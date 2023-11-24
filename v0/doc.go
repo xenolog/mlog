@@ -9,7 +9,7 @@ which provides additional functionality to the stdlib [log/slog].
 # MultipleHandler
 
 [MultipleHandler] allows to write one log event to multiple destinations.
-See examples/multiple_destinations.go to usage.
+See `examples/multiple_destinations.go` to usage.
 
 # HumanReadableHandler
 
@@ -33,7 +33,7 @@ as a string and passes it to the [log] package.
 	2022/11/08 15:28:26 INFO hello count=3
 
 For more control over the output format, create a logger with a different handler.
-This statement uses [New] to create a new logger with a HumanReadableHandler
+This statement uses [slog.New] to create a new logger with a HumanReadableHandler
 that writes structured records in text form to standard error:
 
 	logger := slog.New(mlog.HumanReadableHandler(os.Stderr, nil))
@@ -52,8 +52,8 @@ Setting a logger as the default with
 
 	slog.SetDefault(logger)
 
-will cause the top-level functions like [Info] to use it.
-[SetDefault] also updates the default logger used by the [log] package,
+will cause the top-level functions like [slog.Info] to use it.
+[slog.SetDefault] also updates the default logger used by the [log] package,
 so that existing applications that use [log.Printf] and related functions
 will send log records to the logger's handler without needing to be rewritten.
 */
