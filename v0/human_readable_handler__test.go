@@ -27,8 +27,12 @@ func Test__HrHandler__Simple(t *testing.T) {
 	msg := "Just InfoMessage " + uuid.NewString()
 
 	nativeWriter := &bytes.Buffer{}
-	nativeLogger := slog.New(slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true}))
-	nativeLogger.Info(msg)
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler))
+
+	logger.Info(msg)
 
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
@@ -37,9 +41,6 @@ func Test__HrHandler__Simple(t *testing.T) {
 	nativeTime, err := time.Parse(time.RFC3339Nano, nativeTimeStr)
 	tt.NoError(err)
 
-	svWriter := &bytes.Buffer{}
-	svLogger := slog.New(mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true}))
-	svLogger.Info(msg)
 	svLogLineSplitted := strings.Fields(svWriter.String())
 	tt.Greater(len(svLogLineSplitted), 2)
 	svTime, err := time.Parse(time.RFC3339Nano, svLogLineSplitted[0])
@@ -61,14 +62,16 @@ func Test__HrHandler__AddSource(t *testing.T) {
 	msg := "Just InfoMessage " + uuid.NewString()
 
 	nativeWriter := &bytes.Buffer{}
-	nativeLogger := slog.New(slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true}))
-	nativeLogger.Info(msg)
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
+	svHandler := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true, AddSourceToAttrs: true})
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler))
+
+	logger.Info(msg)
+
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
 
-	svWriter := &bytes.Buffer{}
-	svLogger := slog.New(mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true, AddSourceToAttrs: true}))
-	svLogger.Info(msg)
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]
 	svData := map[string]any{}
@@ -95,7 +98,7 @@ func Test__HrHandler__InterceptSimpleLogger(t *testing.T) {
 	msg := "Just InfoMessage " + uuid.NewString()
 
 	svWriter := &bytes.Buffer{}
-	hnldr := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true})
+	hnldr := mlog.NewHumanReadableHandler(svWriter, nil)
 	slog.New(hnldr)
 	stdLog := slog.NewLogLogger(hnldr, slog.LevelInfo)
 	now := time.Now()
@@ -134,8 +137,12 @@ func Test__HrHandler__Values(t *testing.T) {
 	valDataTime := time.Now()
 
 	nativeWriter := &bytes.Buffer{}
-	nativeLogger := slog.New(slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true}))
-	nativeLogger.Info(msg,
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler))
+
+	logger.Info(msg,
 		valKeyInt, valDataInt,
 		valKeyBool, valDataBool,
 		valKeyString, valDataString,
@@ -144,14 +151,6 @@ func Test__HrHandler__Values(t *testing.T) {
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
 
-	svWriter := &bytes.Buffer{}
-	svLogger := slog.New(mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true}))
-	svLogger.Info(msg,
-		valKeyInt, valDataInt,
-		valKeyBool, valDataBool,
-		valKeyString, valDataString,
-		valKeyTime, valDataTime,
-	)
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]
 	// tt.Zero(string(jsonBuf)) // enable if deep debug required
@@ -202,16 +201,14 @@ func Test__HrHandler__WithAttrs(t *testing.T) {
 	attr2 := slog.Attr{Key: attr2key, Value: slog.BoolValue(attr2data)}
 
 	nativeWriter := &bytes.Buffer{}
-	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true}).WithAttrs([]slog.Attr{attr1, attr2})
-	nativeLogger := slog.New(nativeHnldr)
-	nativeLogger.Info(msg, attr3key, attr3data)
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler).WithAttrs([]slog.Attr{attr1, attr2}))
+
+	logger.Info(msg, attr3key, attr3data)
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
-
-	svWriter := &bytes.Buffer{}
-	svHnldr := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true}).WithAttrs([]slog.Attr{attr1, attr2})
-	svLogger := slog.New(svHnldr)
-	svLogger.Info(msg, attr3key, attr3data)
 
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]
@@ -250,16 +247,15 @@ func Test__Logger__With(t *testing.T) {
 	attr3data := uuid.NewString()
 
 	nativeWriter := &bytes.Buffer{}
-	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
-	nativeLogger := slog.New(nativeHnldr).With(attr1key, attr1data, attr2key, attr2data)
-	nativeLogger.Info(msg, attr3key, attr3data)
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler)).With(attr1key, attr1data, attr2key, attr2data)
+
+	logger.Info(msg, attr3key, attr3data)
+
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
-
-	svWriter := &bytes.Buffer{}
-	svHnldr := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true})
-	svLogger := slog.New(svHnldr).With(attr1key, attr1data, attr2key, attr2data)
-	svLogger.Info(msg, attr3key, attr3data)
 
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]
@@ -298,16 +294,15 @@ func Test__Logger__With__DuplicateAttrs(t *testing.T) {
 	attr3data := uuid.NewString()
 
 	nativeWriter := &bytes.Buffer{}
-	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
-	nativeLogger := slog.New(nativeHnldr).With(attr1key, attr1data, attr2key, attr3data) // fill Attr2 with attr3 data
-	nativeLogger.Info(msg, attr2key, attr2data)                                          // rewrite Attr2
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler))
+	logger = logger.With(attr1key, attr1data, attr2key, attr3data) // fill Attr2 with attr3 data
+	logger.Info(msg, attr2key, attr2data)                          // rewrite Attr2
+
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
-
-	svWriter := &bytes.Buffer{}
-	svHnldr := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true})
-	svLogger := slog.New(svHnldr).With(attr1key, attr1data, attr2key, attr3data) // fill Attr2 with attr3 data
-	svLogger.Info(msg, attr2key, attr2data)                                      // rewrite Attr2
 
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]
@@ -340,16 +335,15 @@ func Test__Logger__With__DuplicateAttrsInTheDifferentGroup(t *testing.T) {
 	attr3data := uuid.NewString()
 
 	nativeWriter := &bytes.Buffer{}
-	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
-	nativeLogger := slog.New(nativeHnldr).With(attr2key, attr3data).With(attr1key, attr1data) // fill Attr2 with attr3 data
-	nativeLogger.Info(msg, attr2key, attr2data)                                               // rewrite Attr2
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler))
+	logger = logger.With(attr2key, attr3data).With(attr1key, attr1data) // fill Attr2 with attr3 data
+	logger.Info(msg, attr2key, attr2data)                               // rewrite Attr2
+
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
-
-	svWriter := &bytes.Buffer{}
-	svHnldr := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true})
-	svLogger := slog.New(svHnldr).With(attr2key, attr3data).With(attr1key, attr1data) // fill Attr2 with attr3 data
-	svLogger.Info(msg, attr2key, attr2data)                                           // rewrite Attr2
 
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]
@@ -385,16 +379,16 @@ func Test__Logger__WithGroup(t *testing.T) {
 	attr2data := uuid.NewString() + "-2"
 
 	nativeWriter := &bytes.Buffer{}
-	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
-	nativeLogger := slog.New(nativeHnldr).With(attr0key, attr0data).WithGroup(group1name).With(attr1key, attr1data).WithGroup(group2name)
-	nativeLogger.Info(msg, attr2key, attr2data)
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler))
+	logger = logger.With(attr0key, attr0data).WithGroup(group1name).With(attr1key, attr1data).WithGroup(group2name)
+
+	logger.Info(msg, attr2key, attr2data)
+
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
-
-	svWriter := &bytes.Buffer{}
-	svHnldr := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true})
-	svLogger := slog.New(svHnldr).With(attr0key, attr0data).WithGroup(group1name).With(attr1key, attr1data).WithGroup(group2name)
-	svLogger.Info(msg, attr2key, attr2data)
 
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]
@@ -434,16 +428,15 @@ func Test__Logger__WithGroup__GroupOverwriteExistingAttribute(t *testing.T) {
 	attr1data := uuid.NewString() + "-1"
 
 	nativeWriter := &bytes.Buffer{}
-	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
-	nativeLogger := slog.New(nativeHnldr).With(attr0key, attr0data).WithGroup(attr0key)
-	nativeLogger.Info(msg, attr2key, attr1data)
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler)).With(attr0key, attr0data).WithGroup(attr0key)
+
+	logger.Info(msg, attr2key, attr1data)
+
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
-
-	svWriter := &bytes.Buffer{}
-	svHnldr := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true})
-	svLogger := slog.New(svHnldr).With(attr0key, attr0data).WithGroup(attr0key)
-	svLogger.Info(msg, attr2key, attr1data)
 
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]
@@ -477,16 +470,15 @@ func Test__Logger__WithGroup__AttributeWithSameNameWithGroup(t *testing.T) {
 	attr1data := uuid.NewString() + "-1"
 
 	nativeWriter := &bytes.Buffer{}
-	nativeHnldr := slog.NewJSONHandler(nativeWriter, &slog.HandlerOptions{AddSource: true})
-	nativeLogger := slog.New(nativeHnldr).WithGroup(attr0key).With(attr0key, attr0data)
-	nativeLogger.Info(msg, attr2key, attr1data)
+	svWriter := &bytes.Buffer{}
+	nativeHandler := slog.NewJSONHandler(nativeWriter, nil)
+	svHandler := mlog.NewHumanReadableHandler(svWriter, nil)
+	logger := slog.New(mlog.NewMultipleHandler(nil, nativeHandler, svHandler)).WithGroup(attr0key).With(attr0key, attr0data)
+
+	logger.Info(msg, attr2key, attr1data)
+
 	nativeData := map[string]any{}
 	tt.NoError(json.Unmarshal(nativeWriter.Bytes(), &nativeData))
-
-	svWriter := &bytes.Buffer{}
-	svHnldr := mlog.NewHumanReadableHandler(svWriter, &mlog.HumanReadableHandlerOptions{AddSource: true})
-	svLogger := slog.New(svHnldr).WithGroup(attr0key).With(attr0key, attr0data)
-	svLogger.Info(msg, attr2key, attr1data)
 
 	pos := bytes.Index(svWriter.Bytes(), []byte(mlog.AttrsJSONprefix))
 	jsonBuf := svWriter.Bytes()[pos+len(mlog.AttrsJSONprefix):]

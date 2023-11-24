@@ -29,7 +29,7 @@ func main() {
 	stdHandler := mlog.NewHumanReadableHandler(os.Stdout, &mlog.HumanReadableHandlerOptions{Level: slog.LevelInfo})
 
 	// combine log handlers and initialize logger
-	logHandler := mlog.NewMultipleHandler([]slog.Handler{debugHandler, stdHandler}, nil)
+	logHandler := mlog.NewMultipleHandler(nil, debugHandler, stdHandler)
 	logger := slog.New(logHandler)
 	slog.SetDefault(logger) // redirect all log streams (ancient log and slog) to a freshly created logger
 

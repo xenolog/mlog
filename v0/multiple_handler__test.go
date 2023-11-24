@@ -24,7 +24,7 @@ func Test__MtHandler__Simple(t *testing.T) {
 	secondWriter := &bytes.Buffer{}
 	secondHandler := mlog.NewHumanReadableHandler(secondWriter, &mlog.HumanReadableHandlerOptions{AddSourceToAttrs: true})
 
-	mtHandler := mlog.NewMultipleHandler([]slog.Handler{firstHandler, secondHandler}, nil)
+	mtHandler := mlog.NewMultipleHandler(nil, firstHandler, secondHandler)
 	logger := slog.New(mtHandler)
 
 	logger.Info(msg)
@@ -68,7 +68,7 @@ func Test__MtHandler__LogLevel(t *testing.T) {
 	secondWriter := &bytes.Buffer{}
 	secondHandler := mlog.NewHumanReadableHandler(secondWriter, &mlog.HumanReadableHandlerOptions{}) // defaultLogLevel == INFO
 
-	mtHandler := mlog.NewMultipleHandler([]slog.Handler{firstHandler, secondHandler}, nil)
+	mtHandler := mlog.NewMultipleHandler(nil, firstHandler, secondHandler)
 	logger := slog.New(mtHandler)
 	stdLogger := slog.NewLogLogger(mtHandler, slog.LevelInfo)
 
@@ -101,3 +101,6 @@ func Test__MtHandler__LogLevel(t *testing.T) {
 		return string(s) == infoMsg
 	}))
 }
+
+// todo: Test__MtHandler__With()
+// todo: Test__MtHandler__WithGroup()

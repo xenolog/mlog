@@ -17,7 +17,7 @@ type MultipleHandler struct {
 
 // NewMultipleHandler creates a MultipleHandler that multiply each incoming message to each given handler,
 // using the given options. If opts is nil, the default options are used.
-func NewMultipleHandler(handlerSet []slog.Handler, _ *MultipleHandlerOptions) *MultipleHandler {
+func NewMultipleHandler(_ *MultipleHandlerOptions, handlerSet ...slog.Handler) *MultipleHandler {
 	h := &MultipleHandler{
 		handlers: handlerSet,
 		level:    (^slog.Level(0) >> 1), // maximum value of slog.Level type
