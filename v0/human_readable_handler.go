@@ -21,10 +21,14 @@ type group struct {
 
 type HumanReadableHandlerOptions struct {
 	// AddSource causes the handler to compute the source code position
-	// of the log statement and add a SourceKey attribute to the output.
-	AddSource        bool
+	// of the log statement and add source file name and line No to the output as plain text.
+	AddSource bool
+
+	// AddSource causes the handler to compute the source code position
+	// of the log statement and add a SourceKey attribute to the ATTRS JSON block.
 	AddSourceToAttrs bool
-	UseLocalTZ       bool
+
+	UseLocalTZ bool
 
 	// Level reports the minimum level to log.
 	// Levels with lower levels are discarded.
@@ -32,6 +36,8 @@ type HumanReadableHandlerOptions struct {
 	Level slog.Leveler
 }
 
+// HumanReadableHandler is a [slog.Handler] that writes Records to an io.Writer as a
+// timestamp, level, message as plain test, and sequence of key=value pairs in the JSON format and followed by a newline.
 type HumanReadableHandler struct {
 	opts   HumanReadableHandlerOptions
 	groups []group
@@ -40,9 +46,12 @@ type HumanReadableHandler struct {
 	out io.Writer
 }
 
-func NewHumanReadableHandler(out io.Writer, opts *HumanReadableHandlerOptions) *HumanReadableHandler {
+// HumanReadableHandler creates a HumanReadableHandler that writes to w, using the given options.
+// If opts is nil, the default options are used.
+// Implements [slog.Handler] interface.
+func NewHumanReadableHandler(w io.Writer, opts *HumanReadableHandlerOptions) *HumanReadableHandler {
 	h := &HumanReadableHandler{
-		out: out,
+		out: w,
 		mu:  &sync.Mutex{},
 		groups: []group{{ // group[0] always exists, has no name and used
 			attrs: jsonTree{}, // to store non-groupped attrs
@@ -73,10 +82,20 @@ func (h *HumanReadableHandler) Copy() *HumanReadableHandler {
 	return rv
 }
 
+// Enabled reports whether the handler handles records at the given level. The handler ignores records whose level is lower.
+// Implements [slog.Handler] interface.
 func (h *HumanReadableHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.opts.Level.Level()
 }
 
+// Handle handles the Record.
+// It will only be called when Enabled returns true.
+// The Context argument is as for Enabled.
+// It is present solely to provide Handlers access to the context's values.
+// Canceling the context should not affect record processing.
+// (Among other things, log messages may be necessary to debug a
+// cancellation-related problem.)
+// Implements [slog.Handler] interface.
 func (h *HumanReadableHandler) Handle(_ context.Context, r slog.Record) error { //nolint:gocritic
 	buf := make([]byte, 0, LogLineBuffSize)
 	if !r.Time.IsZero() {
@@ -138,6 +157,8 @@ func (h *HumanReadableHandler) Handle(_ context.Context, r slog.Record) error { 
 	return err
 }
 
+// WithAttrs returns a new HumanReadableHandler whose attributes consists of h's attributes followed by attrs.
+// Implements [slog.Handler] interface.
 func (h *HumanReadableHandler) WithAttrs(aa []slog.Attr) slog.Handler {
 	hh := h.Copy()
 	idx := len(hh.groups) - 1
@@ -147,6 +168,8 @@ func (h *HumanReadableHandler) WithAttrs(aa []slog.Attr) slog.Handler {
 	return hh
 }
 
+// WithGroup returns a new HumanReadableHandler with the given group appended to the receiver's existing groups.
+// Implements [slog.Handler] interface.
 func (h *HumanReadableHandler) WithGroup(name string) slog.Handler {
 	var hh *HumanReadableHandler
 	if name != "" {
