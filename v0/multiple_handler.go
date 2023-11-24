@@ -9,11 +9,14 @@ import (
 type MultipleHandlerOptions struct { // todo(sv): reserved to the future to prevend broke interface
 }
 
+// MultipleHandler is a [slog.Handler] that multiply Records to each given handler as is.
 type MultipleHandler struct {
 	level    slog.Level
 	handlers []slog.Handler
 }
 
+// NewMultipleHandler creates a MultipleHandler that multiply each incoming message to each given handler,
+// using the given options. If opts is nil, the default options are used.
 func NewMultipleHandler(handlerSet []slog.Handler, _ *MultipleHandlerOptions) *MultipleHandler {
 	h := &MultipleHandler{
 		handlers: handlerSet,
@@ -39,10 +42,14 @@ func (h *MultipleHandler) Copy() *MultipleHandler {
 	return rv
 }
 
+// Enabled reports whether the handler handles records at the given level. The handler ignores records whose level is lower.
+// Implements [slog.Handler] interface.
 func (h *MultipleHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level
 }
 
+// WithAttrs returns a new HumanReadableHandler whose attributes consists of h's attributes followed by attrs.
+// Implements [slog.Handler] interface.
 func (h *MultipleHandler) WithAttrs(aa []slog.Attr) slog.Handler {
 	rv := h.Copy()
 	for i := range h.handlers {
@@ -51,6 +58,8 @@ func (h *MultipleHandler) WithAttrs(aa []slog.Attr) slog.Handler {
 	return rv
 }
 
+// WithGroup returns a new HumanReadableHandler with the given group appended to the receiver's existing groups.
+// Implements [slog.Handler] interface.
 func (h *MultipleHandler) WithGroup(name string) slog.Handler {
 	var rv *MultipleHandler
 	if name != "" {
@@ -64,6 +73,9 @@ func (h *MultipleHandler) WithGroup(name string) slog.Handler {
 	return rv
 }
 
+// Handle handles the Record.
+// It will only be called when Enabled returns true.
+// Implements [slog.Handler] interface.
 func (h *MultipleHandler) Handle(ctx context.Context, r slog.Record) error { //nolint:gocritic
 	var firstErr error
 	for i := range h.handlers {
