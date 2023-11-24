@@ -24,8 +24,8 @@ type HumanReadableHandlerOptions struct {
 	// of the log statement and add source file name and line No to the output as plain text.
 	AddSource bool
 
-	// AddSource causes the handler to compute the source code position
-	// of the log statement and add a SourceKey attribute to the ATTRS JSON block.
+	// AddSourceToAttrs causes the handler to compute the source code position
+	// of the log statement and add a "source" attribute to the ATTRS JSON block.
 	AddSourceToAttrs bool
 
 	UseLocalTZ bool
@@ -46,7 +46,7 @@ type HumanReadableHandler struct {
 	out io.Writer
 }
 
-// HumanReadableHandler creates a HumanReadableHandler that writes to w, using the given options.
+// NewHumanReadableHandler creates a HumanReadableHandler that writes to w, using the given options.
 // If opts is nil, the default options are used.
 // Implements [slog.Handler] interface.
 func NewHumanReadableHandler(w io.Writer, opts *HumanReadableHandlerOptions) *HumanReadableHandler {
@@ -90,11 +90,6 @@ func (h *HumanReadableHandler) Enabled(_ context.Context, level slog.Level) bool
 
 // Handle handles the Record.
 // It will only be called when Enabled returns true.
-// The Context argument is as for Enabled.
-// It is present solely to provide Handlers access to the context's values.
-// Canceling the context should not affect record processing.
-// (Among other things, log messages may be necessary to debug a
-// cancellation-related problem.)
 // Implements [slog.Handler] interface.
 func (h *HumanReadableHandler) Handle(_ context.Context, r slog.Record) error { //nolint:gocritic
 	buf := make([]byte, 0, LogLineBuffSize)
