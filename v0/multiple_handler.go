@@ -6,8 +6,10 @@ import (
 	"slices"
 )
 
-type MultipleHandlerOptions struct { // todo(sv): reserved to the future to prevend broke interface
-}
+// MultipleHandler currently has no options,
+// but this will change in the future and the type is reserved
+// to maintain backward compatibility
+type MultipleHandlerOptions struct{}
 
 // MultipleHandler is a [slog.Handler] that multiply Records to each given handler as is.
 type MultipleHandler struct {
@@ -74,7 +76,7 @@ func (h *MultipleHandler) WithGroup(name string) slog.Handler {
 }
 
 // Handle handles the Record.
-// It will only be called when Enabled returns true.
+// It will only be called when Enabled(...) returns true.
 // Implements [slog.Handler] interface.
 func (h *MultipleHandler) Handle(ctx context.Context, r slog.Record) error { //nolint:gocritic
 	var firstErr error

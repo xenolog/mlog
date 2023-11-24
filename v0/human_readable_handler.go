@@ -36,7 +36,7 @@ type HumanReadableHandlerOptions struct {
 	Level slog.Leveler
 }
 
-// HumanReadableHandler is a [slog.Handler] that writes Records to an io.Writer as a
+// HumanReadableHandler is a [slog.Handler] that writes Records to an [io.Writer] as a
 // timestamp, level, message as plain test, and sequence of key=value pairs in the JSON format and followed by a newline.
 type HumanReadableHandler struct {
 	opts   HumanReadableHandlerOptions
@@ -89,7 +89,7 @@ func (h *HumanReadableHandler) Enabled(_ context.Context, level slog.Level) bool
 }
 
 // Handle handles the Record.
-// It will only be called when Enabled returns true.
+// It will only be called when Enabled(...) returns true.
 // Implements [slog.Handler] interface.
 func (h *HumanReadableHandler) Handle(_ context.Context, r slog.Record) error { //nolint:gocritic
 	buf := make([]byte, 0, LogLineBuffSize)
