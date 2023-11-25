@@ -5,6 +5,7 @@ import "log/slog"
 const (
 	TimeOutputFormatRFC3339 = "2006-01-02T15:04:05.000000Z07"
 	LogLineBuffSize         = 1024
+	InitialBufSize          = 1024 * 8
 	AttrsJSONprefix         = "ATTRS="
 )
 

@@ -43,14 +43,16 @@ var allowedProto = []string{"tcp", "udp", "unix"} //nolint:gochecknoglobals
 // -----------------------------------------------------------------------------
 // SyslogProxy is a type that provides interaction with the syslog Proxyserver
 type SyslogProxy struct {
-	buf      *bytes.Buffer
-	priority logSyslog.Priority
-	tag      string
-	hostname string
-	url      string
-	conn     net.Conn // connection, disconnected if nil
-	timeout  time.Duration
-	mu       *sync.Mutex
+	buf            *bytes.Buffer
+	lineProcessBuf []byte
+	priority       logSyslog.Priority
+	tag            string
+	hostname       string
+	url            string
+	conn           net.Conn // connection, disconnected if nil
+	timeout        time.Duration
+	stderrLogger   *slog.Logger
+	mu             *sync.Mutex
 }
 
 // LocalWriter returns a [io.Writer] which may be used
@@ -59,9 +61,9 @@ func (s *SyslogProxy) LocalWriter() io.Writer {
 	return s.buf
 }
 
-func (s *SyslogProxy) LocalBuffer() *bytes.Buffer {
-	return s.buf
-}
+// func (s *SyslogProxy) LocalBuffer() bufio.ReadWriter {
+// 	return s.buf
+// }
 
 func (s *SyslogProxy) Lock() {
 	s.mu.Lock()
@@ -146,7 +148,7 @@ func (s *SyslogProxy) Disconnect() {
 
 // ProcessLines process each line of  LocalBuffer by given function.
 // be carefully, strongly recommended wrap this call by mutex Lock()/Unlock.
-func (s *SyslogProxy) ProcessLines(f func(string) (string, error)) error {
+func (s *SyslogProxy) ProcessLines(f func([]byte) ([]byte, error)) (err error) {
 	if !s.IsConnected() {
 		return fmt.Errorf("%w: not connected", ErrSyslogConnection)
 	}
@@ -154,17 +156,21 @@ func (s *SyslogProxy) ProcessLines(f func(string) (string, error)) error {
 		return fmt.Errorf("%w: %w", ErrSyslogConnection, err)
 	}
 
-	defer s.buf.Reset() // clean buffer after all lines pushed to Syslog server
-
-	scanner := bufio.NewScanner(s.LocalBuffer())
+	// for { // todo(sv): Should be rewriten for async usage !!!
+	// 	line, err := s.bufReader.ReadBytes('\n') // or .ReadSlice ???
+	// 	switch err {
+	// 		case
+	// 	}
+	// }
+	scanner := bufio.NewScanner(s.buf)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line != "" {
-			line, err := f(line) //nolint:govet
+			line, err := f([]byte(line))
 			if err != nil {
 				return err // just return err from user provided function
 			}
-			_, err = s.conn.Write([]byte(line))
+			_, err = s.conn.Write(line)
 			if err != nil {
 				return fmt.Errorf("%w: %w", ErrSyslogWrite, err)
 			}
@@ -187,12 +193,16 @@ func NewSyslogProxy(priority logSyslog.Priority, tag string) *SyslogProxy {
 	}
 	hostname, _ := os.Hostname()
 
+	buf := make([]byte, 0, InitialBufSize)
+
 	s := &SyslogProxy{
-		buf:      &bytes.Buffer{},
-		priority: priority,
-		tag:      tag,
-		hostname: hostname,
-		mu:       &sync.Mutex{},
+		buf:            bytes.NewBuffer(buf),
+		lineProcessBuf: make([]byte, 256),
+		priority:       priority,
+		tag:            tag,
+		hostname:       hostname,
+		stderrLogger:   slog.New(NewHumanReadableHandler(os.Stderr, nil)),
+		mu:             &sync.Mutex{},
 	}
 	return s
 }
@@ -262,17 +272,11 @@ func (h *SyslogHandler) Handle(ctx context.Context, r slog.Record) error { //nol
 		return fmt.Errorf("%w: %w", ErrSyslogHandle, err)
 	}
 
-	err := h.syslogPx.ProcessLines(func(line string) (string, error) {
-		// line is result of chield's Handle(...) call
-		// - detect and cut timestamp at begin of line if exists
-		// - format line which corresponds to Syslog proto
-		return line, nil
+	err := h.syslogPx.ProcessLines(func(line []byte) ([]byte, error) {
+		return TrimTimestamp(line), nil
 	})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func NewSyslogHandler(syslogPx *SyslogProxy, h slog.Handler, _ *SyslogHandlerOptions) *SyslogHandler {
