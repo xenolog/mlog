@@ -49,6 +49,7 @@ type SyslogProxy struct {
 	hostname string
 	url      string
 	conn     net.Conn // connection, disconnected if nil
+	timeout  time.Duration
 	mu       *sync.Mutex
 }
 
@@ -62,11 +63,12 @@ func (s *SyslogProxy) LocalBuffer() *bytes.Buffer {
 	return s.buf
 }
 
-// CleanLocalBuffer LocalBuffer safe
-func (s *SyslogProxy) CleanLocalBuffer() {
+func (s *SyslogProxy) Lock() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.buf.Reset()
+}
+
+func (s *SyslogProxy) Unlock() {
+	s.mu.Unlock()
 }
 
 // Connect (or re-connect) to the given syslog server or socket
@@ -114,6 +116,7 @@ func (s *SyslogProxy) Connect(url string, timeout time.Duration) error {
 		return fmt.Errorf("%w: %w", ErrSyslogConnection, err)
 	}
 	s.conn = c
+	s.timeout = timeout
 	return nil
 }
 
@@ -128,14 +131,31 @@ func (s *SyslogProxy) Disconnect() {
 	}
 }
 
-// Writer returns a [io.Writer] which may be used
-// to send something to Syslog server
-// returns nil if not connected
-func (s *SyslogProxy) Writer() io.Writer {
-	return s.conn
-}
+// // CleanLocalBuffer LocalBuffer safe
+// func (s *SyslogProxy) CleanLocalBuffer() {
+// 	s.mu.Lock()
+// 	defer s.mu.Unlock()
+// 	s.buf.Reset()
+// }
+// // Writer returns a [io.Writer] which may be used
+// // to send something to Syslog server
+// // returns nil if not connected
+// func (s *SyslogProxy) Writer() io.Writer {
+// 	return s.conn
+// }
 
+// ProcessLines process each line of  LocalBuffer by given function.
+// be carefully, strongly recommended wrap this call by mutex Lock()/Unlock.
 func (s *SyslogProxy) ProcessLines(f func(string) (string, error)) error {
+	if !s.IsConnected() {
+		return fmt.Errorf("%w: not connected", ErrSyslogConnection)
+	}
+	if err := s.conn.SetWriteDeadline(time.Now().Add(s.timeout)); err != nil {
+		return fmt.Errorf("%w: %w", ErrSyslogConnection, err)
+	}
+
+	defer s.buf.Reset() // clean buffer after all lines pushed to Syslog server
+
 	scanner := bufio.NewScanner(s.LocalBuffer())
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -236,9 +256,8 @@ func (h *SyslogHandler) Handle(ctx context.Context, r slog.Record) error { //nol
 		return fmt.Errorf("%w: not connected", ErrSyslogConnection)
 	}
 
-	h.syslogPx.mu.Lock() // should be locked before call chield's Handle() because  LocalWriter used by one
-	defer h.syslogPx.CleanLocalBuffer()
-	defer h.syslogPx.mu.Unlock()
+	h.syslogPx.Lock() // should be locked before call chield's Handle() because  LocalWriter used by one
+	defer h.syslogPx.Unlock()
 	if err := h.handler.Handle(ctx, r); err != nil {
 		return fmt.Errorf("%w: %w", ErrSyslogHandle, err)
 	}
