@@ -25,7 +25,7 @@ func NewMultipleHandler(_ *MultipleHandlerOptions, handlerSet ...slog.Handler) *
 		level:    (^slog.Level(0) >> 1), // maximum value of slog.Level type
 	}
 exLoop:
-	for _, logLevel := range []slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError} {
+	for _, logLevel := range allowedLevels {
 		for _, hh := range h.handlers {
 			if hh.Enabled(context.TODO(), logLevel) {
 				h.level = logLevel

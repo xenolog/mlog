@@ -1,11 +1,35 @@
+//revive:disable:add-constant
 package mlog_test
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 
 	"github.com/itchyny/gojq"
 )
+
+const fakeSyslogSocket = "/fssock"
+
+// -----------------------------------------------------------------------------
+type FakeSyslog struct {
+	Buf      *bytes.Buffer
+	sockFile string
+}
+
+func (s *FakeSyslog) Destroy() {
+	s.Buf.Reset()
+}
+
+func NewFakeSyslog(path string) *FakeSyslog {
+	ss := &FakeSyslog{
+		sockFile: path,
+		Buf:      &bytes.Buffer{},
+	}
+	// create sock
+	// go listen loop
+	return ss
+}
 
 // -----------------------------------------------------------------------------
 

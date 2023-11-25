@@ -5,6 +5,8 @@ import (
 	"runtime"
 )
 
+var allowedLevels = []slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError} //nolint:gochecknoglobals
+
 // DecodeSource returns a new [slog.Source] which describes
 // the location of a line of source code.
 func DecodeSource(pc uintptr) *slog.Source {

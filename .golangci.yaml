@@ -180,7 +180,7 @@ linters-settings:
       - name: add-constant
         arguments:
           - maxLitCount: "3"
-            allowStrs: '"","/"'
+            allowStrs: '"","/","%w: %w"'
             allowInts: "0,1,2"
       - name: imports-blacklist
         arguments:

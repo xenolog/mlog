@@ -147,7 +147,7 @@ func (h *HumanReadableHandler) Handle(_ context.Context, r slog.Record) error { 
 	defer h.mu.Unlock()
 	_, err := h.out.Write(buf)
 	if err != nil {
-		err = errors.Join(Error, err)
+		err = errors.Join(Err, err)
 	}
 	return err
 }
