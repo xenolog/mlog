@@ -2,9 +2,18 @@
 package mlog_test
 
 import (
+	"bufio"
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/itchyny/gojq"
 )
@@ -13,21 +22,104 @@ const fakeSyslogSocket = "/fssock"
 
 // -----------------------------------------------------------------------------
 type FakeSyslog struct {
-	Buf      *bytes.Buffer
-	sockFile string
+	buf       *bytes.Buffer
+	sockPath  string
+	keepAlive int
+	connectNo int
+	listener  net.Listener
 }
 
-func (s *FakeSyslog) Destroy() {
-	s.Buf.Reset()
+func (s *FakeSyslog) Buffer() *bytes.Buffer {
+	return s.buf
+}
+
+func (s *FakeSyslog) Run(ctx context.Context) (c chan struct{}, err error) {
+	// create sock
+	lc := &net.ListenConfig{
+		KeepAlive: time.Duration(s.keepAlive) * time.Second,
+	}
+	s.listener, err = lc.Listen(ctx, "unix", s.sockPath)
+	if err != nil {
+		return nil, fmt.Errorf("Listen error: %w", err)
+	}
+
+	go func() {
+		<-ctx.Done()
+		s.Finish()
+	}()
+
+	log.Println("server started")
+	go func() {
+		for {
+			// Wait for a connection.
+			conn, err := s.listener.Accept()
+			switch {
+			case errors.Is(err, net.ErrClosed):
+				return
+			case err != nil:
+				log.Printf("Accept error: %s", err)
+				return
+			default:
+				go s.handleConnection(s.connectNo, conn)
+				s.connectNo++
+			}
+		}
+	}()
+	c = make(chan struct{}, 1)
+	c <- struct{}{}
+	return c, nil
+}
+
+func (s *FakeSyslog) store(str string) {
+	_, err := s.buf.WriteString(str)
+	if err != nil {
+		log.Printf("ErrStore: %s", err)
+	}
+	log.Printf("stored: %s", str)
+}
+
+func (s *FakeSyslog) handleConnection(cNo int, c net.Conn) {
+	reader := bufio.NewReader(c)
+exLoop:
+	for {
+		str, err := reader.ReadString('\n')
+		switch {
+		case errors.Is(err, io.EOF):
+			str = fmt.Sprintf("%03d: %s<EOF>", cNo, str)
+			s.store(str)
+			break exLoop
+		case err != nil:
+			log.Printf("%03d: %s", cNo, err)
+			break exLoop
+		default:
+			str = fmt.Sprintf("%03d: %s", cNo, strings.TrimRight(str, "\n"))
+			// log.Printf("%03d: %s", cNo, strings.TrimRight(str, "\n")
+			s.store(str)
+		}
+	}
+	// Shut down the connection.
+	err := c.Close()
+	if err != nil {
+		log.Printf("Close connection error: %s", err)
+	}
+	log.Printf("%03d: c	onnection closed.", cNo)
+}
+
+func (s *FakeSyslog) Finish() {
+	log.Println("finishing server...")
+	if err := s.listener.Close(); err != nil {
+		log.Printf("Listener close error: %s", err)
+	}
+	if err := os.Remove(s.sockPath); err != nil && !os.IsNotExist(err) {
+		log.Printf("unable to remove `%s`: %s", s.sockPath, err)
+	}
 }
 
 func NewFakeSyslog(path string) *FakeSyslog {
 	ss := &FakeSyslog{
-		sockFile: path,
-		Buf:      &bytes.Buffer{},
+		sockPath: path,
+		buf:      &bytes.Buffer{},
 	}
-	// create sock
-	// go listen loop
 	return ss
 }
 

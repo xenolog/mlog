@@ -2,8 +2,11 @@
 package mlog_test
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	assert "github.com/stretchr/testify/require"
@@ -37,17 +40,33 @@ func Test__TrimTimestamp(t *testing.T) {
 }
 
 func Test__SyHandler__Simple(t *testing.T) {
+	deadline, ok := t.Deadline()
+	if !ok {
+		deadline = time.Now().Add(5 * time.Second)
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), deadline.Add(-1*time.Second))
+	defer cancel()
+
 	tmpDir := t.TempDir()
 	sockFile := tmpDir + fakeSyslogSocket
 
 	tt := assert.New(t)
-	msg := "Just InfoMessage " + uuid.NewString()
+	msg := "Just InfoMessage\n\n" + uuid.NewString() + "\n"
 
 	ss := NewFakeSyslog(sockFile)
-	defer ss.Destroy()
+	ready, err := ss.Run(ctx)
+	tt.NoError(err)
+	<-ready
 
-	// small TCP or unix socket server should be inplemented to store
-	// all incoming lines into bytes.Buffer
+	conn, err := net.Dial("unix", sockFile)
+	tt.NoError(err)
 
-	tt.NotZero(msg)
+	_, err = conn.Write([]byte(msg))
+	tt.NoError(err)
+	time.Sleep(time.Second)
+	tt.NoError(conn.Close())
+
+	tt.Zero(ss.Buffer().String())
+	// tt.EqualValues("", ss.Buffer().String())
+	// tt.NotEqualValues("", ss.Buffer().String())
 }
