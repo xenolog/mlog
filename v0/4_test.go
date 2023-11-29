@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -70,31 +69,31 @@ func (s *FakeSyslog) Run(ctx context.Context) (c chan struct{}, err error) {
 	return c, nil
 }
 
-func (s *FakeSyslog) store(str string) {
+func (s *FakeSyslog) store(n int, str string) {
 	_, err := s.buf.WriteString(str)
 	if err != nil {
 		log.Printf("ErrStore: %s", err)
 	}
-	log.Printf("stored: %s", str)
+	log.Printf("%03d: stored: %s", n, str)
 }
 
 func (s *FakeSyslog) handleConnection(cNo int, c net.Conn) {
+	log.Printf("%03d: handle connection on '%s' from '%s'", cNo, c.LocalAddr(), c.RemoteAddr())
 	reader := bufio.NewReader(c)
 exLoop:
 	for {
 		str, err := reader.ReadString('\n')
 		switch {
 		case errors.Is(err, io.EOF):
-			str = fmt.Sprintf("%03d: %s<EOF>", cNo, str)
-			s.store(str)
+			s.store(cNo, str+"\n")
+			// log.Printf("%03d: %s<EOF>", cNo, str)
 			break exLoop
 		case err != nil:
-			log.Printf("%03d: %s", cNo, err)
+			log.Printf("%03d error while reading: %s", cNo, err)
 			break exLoop
 		default:
-			str = fmt.Sprintf("%03d: %s", cNo, strings.TrimRight(str, "\n"))
-			// log.Printf("%03d: %s", cNo, strings.TrimRight(str, "\n")
-			s.store(str)
+			s.store(cNo, str)
+			// log.Printf("%03d: %s", cNo, strings.TrimRight(str, "\n"))
 		}
 	}
 	// Shut down the connection.
@@ -102,7 +101,7 @@ exLoop:
 	if err != nil {
 		log.Printf("Close connection error: %s", err)
 	}
-	log.Printf("%03d: c	onnection closed.", cNo)
+	log.Printf("%03d: connection closed.", cNo)
 }
 
 func (s *FakeSyslog) Finish() {

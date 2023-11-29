@@ -4,7 +4,7 @@ package mlog_test
 import (
 	"context"
 	"fmt"
-	"net"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -39,6 +39,52 @@ func Test__TrimTimestamp(t *testing.T) {
 	}
 }
 
+func Test__SyslogProxy__Simple(t *testing.T) {
+	deadline, ok := t.Deadline()
+	if !ok {
+		deadline = time.Now().Add(5 * time.Second)
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), deadline.Add(-1*time.Second))
+	defer cancel()
+
+	tmpDir := t.TempDir()
+	sockFile := tmpDir + fakeSyslogSocket
+
+	tt := assert.New(t)
+	msg1 := "First InfoMessage  " + uuid.NewString()
+	msg2 := "Second InfoMessage  " + uuid.NewString()
+
+	ss := NewFakeSyslog(sockFile)
+	ready, err := ss.Run(ctx)
+	tt.NoError(err)
+	<-ready
+
+	syslogPx := mlog.NewSyslogProxy(10, "xxx")
+	tt.NoError(syslogPx.Connect("unix://"+sockFile, 0))
+
+	buf := syslogPx.LocalWriter()
+
+	_, err = buf.Write([]byte(msg1 + "\n")) // up-level handler send message to io.Writer, provided by setup
+	tt.NoError(err)
+	_, err = buf.Write([]byte(msg2)) // up-level handler send message to io.Writer, provided by setup
+	tt.NoError(err)
+	err = syslogPx.ProcessLines(func(b []byte) ([]byte, error) { //
+		return b, nil
+	})
+	tt.NoError(err)
+
+	syslogPx.Disconnect()
+	time.Sleep(1 * time.Second) // may be required to fakeSyslogServer save all incoming messages
+
+	firstMessage, err := ss.Buffer().ReadString('\n')
+	tt.NoError(err)
+	tt.EqualValues(msg1+"\n", firstMessage)
+
+	secondMessage, err := ss.Buffer().ReadString('\n')
+	tt.NoError(err)
+	tt.EqualValues(msg2+"\n", secondMessage)
+}
+
 func Test__SyHandler__Simple(t *testing.T) {
 	deadline, ok := t.Deadline()
 	if !ok {
@@ -51,22 +97,27 @@ func Test__SyHandler__Simple(t *testing.T) {
 	sockFile := tmpDir + fakeSyslogSocket
 
 	tt := assert.New(t)
-	msg := "Just InfoMessage\n\n" + uuid.NewString() + "\n"
+	msg := "Just InfoMessage " + uuid.NewString()
 
 	ss := NewFakeSyslog(sockFile)
 	ready, err := ss.Run(ctx)
 	tt.NoError(err)
 	<-ready
 
-	conn, err := net.Dial("unix", sockFile)
-	tt.NoError(err)
+	// setup mlog.SyslogHandler
 
-	_, err = conn.Write([]byte(msg))
-	tt.NoError(err)
-	time.Sleep(time.Second)
-	tt.NoError(conn.Close())
+	syslogPx := mlog.NewSyslogProxy(10, "xxx")
+	tt.NoError(syslogPx.Connect("unix://"+sockFile, 0))
+	defer syslogPx.Disconnect()
 
-	tt.Zero(ss.Buffer().String())
-	// tt.EqualValues("", ss.Buffer().String())
-	// tt.NotEqualValues("", ss.Buffer().String())
+	logHandler := slog.NewTextHandler(syslogPx.LocalWriter(), nil)
+	syslogHandler := mlog.NewSyslogHandler(syslogPx, logHandler, nil)
+	logger := slog.New(syslogHandler)
+
+	logger.Info(msg)
+	time.Sleep(1 * time.Second) // may be required to fakeSyslogServer save all incoming messages
+
+	firstMessage, err := ss.Buffer().ReadString('\n')
+	tt.NoError(err)
+	tt.Regexp(`msg="`+msg+`"`, firstMessage)
 }

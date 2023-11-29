@@ -156,12 +156,8 @@ func (s *SyslogProxy) ProcessLines(f func([]byte) ([]byte, error)) (err error) {
 		return fmt.Errorf("%w: %w", ErrSyslogConnection, err)
 	}
 
-	// for { // todo(sv): Should be rewriten for async usage !!!
-	// 	line, err := s.bufReader.ReadBytes('\n') // or .ReadSlice ???
-	// 	switch err {
-	// 		case
-	// 	}
-	// }
+	// todo(sv): Should be rewriten for async usage !!!
+	// all processing should have ability to execute in separated goroutine, i.e. threadsafe
 	scanner := bufio.NewScanner(s.buf)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -173,6 +169,12 @@ func (s *SyslogProxy) ProcessLines(f func([]byte) ([]byte, error)) (err error) {
 			_, err = s.conn.Write(line)
 			if err != nil {
 				return fmt.Errorf("%w: %w", ErrSyslogWrite, err)
+			}
+			if line[len(line)-1] != '\n' { // add EOL if not present after processing by user function
+				_, err = s.conn.Write([]byte("\n")) // each line should leads by \n it is a Syslog protocol requirements
+				if err != nil {
+					return fmt.Errorf("%w: %w", ErrSyslogWrite, err)
+				}
 			}
 		}
 	}
