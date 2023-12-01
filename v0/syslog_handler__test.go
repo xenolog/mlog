@@ -62,7 +62,7 @@ func Test__SyslogProxy__Simple(t *testing.T) {
 	syslogPx := mlog.NewSyslogProxy(10, "xxx")
 	tt.NoError(syslogPx.Connect("unix://"+sockFile, 0))
 
-	buf := syslogPx.LocalWriter()
+	buf := syslogPx.Writer()
 
 	_, err = buf.Write([]byte(msg1 + "\n")) // up-level handler send message to io.Writer, provided by setup
 	tt.NoError(err)
@@ -110,7 +110,7 @@ func Test__SyHandler__Simple(t *testing.T) {
 	tt.NoError(syslogPx.Connect("unix://"+sockFile, 0))
 	defer syslogPx.Disconnect()
 
-	logHandler := slog.NewTextHandler(syslogPx.LocalWriter(), nil)
+	logHandler := slog.NewTextHandler(syslogPx.Writer(), nil)
 	syslogHandler := mlog.NewSyslogHandler(syslogPx, logHandler, nil)
 	logger := slog.New(syslogHandler)
 
