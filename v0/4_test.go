@@ -84,7 +84,7 @@ exLoop:
 	for {
 		str, err := reader.ReadString('\n')
 		switch {
-		case errors.Is(err, io.EOF):
+		case errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF):
 			s.store(cNo, str+"\n")
 			// log.Printf("%03d: %s<EOF>", cNo, str)
 			break exLoop

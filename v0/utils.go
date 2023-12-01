@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type TimeFormat struct {
@@ -52,4 +53,57 @@ func TrimTimestamp(b []byte) []byte {
 		}
 	}
 	return b // timestamp not recognized
+}
+
+// ScanJSONobject is a split function for a Scanner that returns each JSON object {...} of input stream.
+// Any any surrounding text skipped. The returned JSON object may be empty.
+func ScanJSONobject(data []byte, _ bool) (advance int, token []byte, err error) {
+	var (
+		r                rune
+		rWidth           int
+		pos              int
+		bracketCount     int
+		process          bool
+		startIDX, endIDX int
+	)
+
+	// log.Printf("%v:'%s'\n", atEOF, string(data))
+	// processLoop:
+	for pos = 0; pos < len(data); pos += rWidth {
+		r, rWidth = utf8.DecodeRune(data[pos:])
+		if rWidth > 1 { // unicode rune, do nothing
+			continue
+		}
+		switch r {
+		case '"':
+			if bracketCount > 0 { // json object started
+				process = !process
+			}
+		case '{':
+			if process {
+				bracketCount++
+				break // switch
+			}
+			if bracketCount == 0 { // start of JSON object
+				process = true
+				bracketCount = 1
+				startIDX = pos
+			}
+		case '}':
+			if process {
+				bracketCount--
+				break // switch
+			}
+		}
+
+		if process && bracketCount == 0 { // finish `}` at JSON object achieved
+			endIDX = pos
+			break // processLoop
+		}
+	}
+
+	if endIDX != 0 {
+		return endIDX, data[startIDX : endIDX+1], nil
+	}
+	return 0, nil, nil
 }
