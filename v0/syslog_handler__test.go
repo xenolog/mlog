@@ -41,6 +41,9 @@ func Test__TrimTimestamp(t *testing.T) {
 }
 
 func Test__SyslogProxy__Simple(t *testing.T) {
+	hostname := "test-host"
+	tag := "test"
+
 	deadline, ok := t.Deadline()
 	if !ok {
 		deadline = time.Now().Add(5 * time.Second)
@@ -60,7 +63,12 @@ func Test__SyslogProxy__Simple(t *testing.T) {
 	tt.NoError(err)
 	<-ready
 
-	syslogPx := mlog.NewSyslogProxy(nil)
+	opts := &mlog.SyslogProxyOptions{
+		Tag:      tag,
+		Hostname: hostname,
+	}
+	syslogPx, err := mlog.NewSyslogProxy(opts)
+	tt.NoError(err)
 	tt.NoError(syslogPx.Connect("unix://"+sockFile, 0))
 
 	buf := syslogPx.Writer()
@@ -69,7 +77,7 @@ func Test__SyslogProxy__Simple(t *testing.T) {
 	tt.NoError(err)
 	_, err = buf.Write([]byte(msg2)) // up-level handler send message to io.Writer, provided by setup
 	tt.NoError(err)
-	err = syslogPx.ProcessLines(func(b []byte) ([]byte, error) { //
+	err = syslogPx.ProcessLines(time.Now(), 0, func(b []byte) ([]byte, error) { //
 		return b, nil
 	})
 	tt.NoError(err)
@@ -79,11 +87,11 @@ func Test__SyslogProxy__Simple(t *testing.T) {
 
 	firstMessage, err := ss.Buffer().ReadString('\n')
 	tt.NoError(err)
-	tt.EqualValues(msg1+"\n", firstMessage)
+	tt.Regexp(`<\d+>.*\s+`+hostname+`\s+`+tag+`\[\d+\d]\:\s+`+msg1+"\n", firstMessage)
 
 	secondMessage, err := ss.Buffer().ReadString('\n')
 	tt.NoError(err)
-	tt.EqualValues(msg2+"\n", secondMessage)
+	tt.Regexp(`<\d+>.*\s+`+hostname+`\s+`+tag+`\[\d+\d]\:\s+`+msg2+"\n", secondMessage)
 }
 
 func Test__SyHandler__Simple(t *testing.T) {
@@ -107,7 +115,12 @@ func Test__SyHandler__Simple(t *testing.T) {
 
 	// setup mlog.SyslogHandler
 
-	syslogPx := mlog.NewSyslogProxy(nil)
+	opts := &mlog.SyslogProxyOptions{
+		Tag:      "test",
+		Hostname: "test-host",
+	}
+	syslogPx, err := mlog.NewSyslogProxy(opts)
+	tt.NoError(err)
 	tt.NoError(syslogPx.Connect("unix://"+sockFile, 0))
 	defer syslogPx.Disconnect()
 

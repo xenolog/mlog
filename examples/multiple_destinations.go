@@ -10,7 +10,7 @@ import (
 	"os"
 	"time"
 
-	mlog "github.com/xenolog/mlog/v0"
+	"github.com/xenolog/mlog/v0"
 )
 
 const fileMode = 0o644

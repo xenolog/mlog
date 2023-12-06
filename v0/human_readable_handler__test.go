@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	assert "github.com/stretchr/testify/require"
-	mlog "github.com/xenolog/mlog/v0"
+	"github.com/xenolog/mlog/v0"
 )
 
 const (
