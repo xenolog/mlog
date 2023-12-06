@@ -33,8 +33,9 @@ func Test__TrimTimestamp(t *testing.T) {
 
 	for i, line := range testData {
 		t.Run(fmt.Sprintf("%02d-%s", i, line), func(t *testing.T) {
-			res := mlog.TrimTimestamp([]byte(line))
+			res, err := mlog.TrimTimestamp([]byte(line))
 			assert.EqualValues(t, "xxx yyy zzz", string(res))
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -59,7 +60,7 @@ func Test__SyslogProxy__Simple(t *testing.T) {
 	tt.NoError(err)
 	<-ready
 
-	syslogPx := mlog.NewSyslogProxy(10, "xxx")
+	syslogPx := mlog.NewSyslogProxy(nil)
 	tt.NoError(syslogPx.Connect("unix://"+sockFile, 0))
 
 	buf := syslogPx.Writer()
@@ -106,7 +107,7 @@ func Test__SyHandler__Simple(t *testing.T) {
 
 	// setup mlog.SyslogHandler
 
-	syslogPx := mlog.NewSyslogProxy(10, "xxx")
+	syslogPx := mlog.NewSyslogProxy(nil)
 	tt.NoError(syslogPx.Connect("unix://"+sockFile, 0))
 	defer syslogPx.Disconnect()
 

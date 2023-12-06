@@ -34,8 +34,6 @@ import (
 const (
 	severityMask = 0x07 // see log/syslog code
 	facilityMask = 0xf8 // see log/syslog code
-
-	defaultTimeout = 15 * time.Second
 )
 
 var allowedProto = []string{"tcp", "udp", "unix"} //nolint:gochecknoglobals
@@ -47,12 +45,13 @@ type SyslogProxy struct {
 	lineProcessBuf []byte
 	priority       logSyslog.Priority
 	tag            string
-	hostname       string
-	url            string
-	conn           net.Conn // connection, disconnected if nil
-	timeout        time.Duration
-	stderrLogger   *slog.Logger
-	mu             *sync.Mutex
+	// hostname       string
+	url          string
+	conn         net.Conn // connection, disconnected if nil
+	useLocalTZ   bool
+	timeout      time.Duration
+	stderrLogger *slog.Logger
+	mu           *sync.Mutex
 }
 
 // Writer returns a [io.Writer] which may be used
@@ -106,7 +105,7 @@ func (s *SyslogProxy) Connect(url string, timeout time.Duration) error {
 	s.url = fmt.Sprintf("%s://%s", proto, addr)
 
 	if timeout == 0 {
-		timeout = defaultTimeout
+		timeout = defaultDialTimeout
 	}
 
 	// dial to the Syslog server
@@ -135,9 +134,9 @@ func (s *SyslogProxy) Disconnect() {
 	}
 }
 
-// ProcessLines process each line of  LocalBuffer by given function.
+// ProcessLines process each line of LocalBuffer by given function.
 // be carefully, strongly recommended wrap this call by mutex Lock()/Unlock.
-func (s *SyslogProxy) ProcessLines(f func([]byte) ([]byte, error)) (err error) {
+func (s *SyslogProxy) ProcessLines(processFunc func([]byte) ([]byte, error)) (err error) {
 	if !s.IsConnected() {
 		return fmt.Errorf("%w: not connected", ErrSyslogConnection)
 	}
@@ -151,7 +150,7 @@ func (s *SyslogProxy) ProcessLines(f func([]byte) ([]byte, error)) (err error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line != "" {
-			line, err := f([]byte(line))
+			line, err := processFunc([]byte(line))
 			if err != nil {
 				return err // just return err from user provided function
 			}
@@ -173,28 +172,49 @@ func (s *SyslogProxy) ProcessLines(f func([]byte) ([]byte, error)) (err error) {
 	return nil
 }
 
+type SyslogProxyOptions struct {
+	UseLocalTZ         bool
+	Priority           logSyslog.Priority
+	Tag                string
+	IOBufSize          int
+	LineProcessBufSize int
+}
+
 // NewSyslog setup and return [Syslog] entity.
-func NewSyslogProxy(priority logSyslog.Priority, tag string) *SyslogProxy {
-	if priority < 0 || priority > logSyslog.LOG_LOCAL7|logSyslog.LOG_DEBUG {
-		priority = logSyslog.LOG_INFO | logSyslog.LOG_USER
+func NewSyslogProxy(opts *SyslogProxyOptions) *SyslogProxy {
+	if opts == nil {
+		opts = &SyslogProxyOptions{}
 	}
 
-	if tag == "" {
-		tag = os.Args[0]
-	}
-	hostname, _ := os.Hostname()
+	// hostname, _ := os.Hostname()
 
-	buf := make([]byte, 0, InitialBufSize)
+	if opts.IOBufSize == 0 {
+		opts.IOBufSize = InitialIOBufSize
+	}
+	if opts.LineProcessBufSize == 0 {
+		opts.LineProcessBufSize = InitialLineProcessBufSize
+	}
+	if opts.Priority < 0 || opts.Priority > logSyslog.LOG_LOCAL7|logSyslog.LOG_DEBUG {
+		opts.Priority = logSyslog.LOG_INFO | logSyslog.LOG_USER
+	}
+
+	if opts.Tag == "" {
+		opts.Tag = os.Args[0]
+	}
+
+	buf := make([]byte, 0, opts.IOBufSize)
 
 	s := &SyslogProxy{
 		buf:            bytes.NewBuffer(buf),
-		lineProcessBuf: make([]byte, 256),
-		priority:       priority,
-		tag:            tag,
-		hostname:       hostname,
-		stderrLogger:   slog.New(NewHumanReadableHandler(os.Stderr, nil)),
-		mu:             &sync.Mutex{},
+		lineProcessBuf: make([]byte, opts.LineProcessBufSize),
+		// hostname:       hostname,
+		priority:     opts.Priority,
+		tag:          opts.Tag,
+		useLocalTZ:   opts.UseLocalTZ,
+		stderrLogger: slog.New(NewHumanReadableHandler(os.Stderr, nil)),
+		mu:           &sync.Mutex{},
 	}
+
 	return s
 }
 
@@ -203,21 +223,26 @@ func NewSyslogProxy(priority logSyslog.Priority, tag string) *SyslogProxy {
 // SyslogHandler currently has no options,
 // but this will change in the future and the type is reserved
 // to maintain backward compatibility
-type SyslogHandlerOptions struct{}
+type SyslogHandlerOptions struct {
+	LineProcessFunc func(line []byte) ([]byte, error)
+}
 
 // SyslogHandler is a proxy Handler that ensures
 // message delivery from any [slog.Handler] to the syslog server
 // It should be used in conjunction with mlog.Syslog
 type SyslogHandler struct {
-	syslogPx *SyslogProxy
-	handler  slog.Handler
-	level    slog.Level
+	syslogPx        *SyslogProxy
+	handler         slog.Handler
+	level           slog.Level // should not be set manually. collected from uplevel slog handler
+	lineProcessFunc func(line []byte) ([]byte, error)
 }
 
 func (h *SyslogHandler) Copy() *SyslogHandler {
 	rv := &SyslogHandler{
-		syslogPx: h.syslogPx,
-		handler:  h.handler,
+		syslogPx:        h.syslogPx,
+		handler:         h.handler,
+		level:           h.level,
+		lineProcessFunc: h.lineProcessFunc,
 	}
 	return rv
 }
@@ -263,17 +288,25 @@ func (h *SyslogHandler) Handle(ctx context.Context, r slog.Record) error { //nol
 		return fmt.Errorf("%w: %w", ErrSyslogHandle, err)
 	}
 
-	err := h.syslogPx.ProcessLines(func(line []byte) ([]byte, error) {
-		return TrimTimestamp(line), nil
-	})
+	err := h.syslogPx.ProcessLines(h.lineProcessFunc)
 
 	return err
 }
 
-func NewSyslogHandler(syslogPx *SyslogProxy, h slog.Handler, _ *SyslogHandlerOptions) *SyslogHandler {
+func NewSyslogHandler(syslogPx *SyslogProxy, h slog.Handler, opts *SyslogHandlerOptions) *SyslogHandler {
+	if opts == nil {
+		opts = &SyslogHandlerOptions{}
+	}
+	if opts.LineProcessFunc == nil {
+		opts.LineProcessFunc = func(line []byte) ([]byte, error) {
+			rv, _ := TrimTimestamp(line)
+			return rv, nil // `unable to trim timestamp` is not a global error
+		}
+	}
 	sh := &SyslogHandler{
-		syslogPx: syslogPx,
-		handler:  h,
+		syslogPx:        syslogPx,
+		handler:         h,
+		lineProcessFunc: opts.LineProcessFunc,
 	}
 	for _, logLevel := range allowedLevels {
 		if h.Enabled(context.TODO(), logLevel) {

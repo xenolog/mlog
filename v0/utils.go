@@ -42,17 +42,18 @@ func DecodeSource(pc uintptr) *slog.Source {
 
 // TrimTimestamp got slice and detect whether it starts with timestamp.
 // returns line with trimmed timestamp if detected
-func TrimTimestamp(b []byte) []byte {
+func TrimTimestamp(b []byte) ([]byte, error) {
 	for i := range timeFormats {
 		fields := anySpaces.Split(strings.TrimSpace(string(b)), timeFormats[i].words+1)
 		tss := strings.Join(fields[:len(fields)-1], " ")
-		_, err := time.Parse(timeFormats[i].format, tss)
-		if err == nil {
+		if _, err := time.Parse(timeFormats[i].format, tss); err == nil {
 			// time parsed successfully
-			return []byte(fields[len(fields)-1]) // last field
+			return []byte(fields[len(fields)-1]), nil // last field
 		}
 	}
-	return b // timestamp not recognized
+	return b, &time.ParseError{ // timestamp not recognized
+		Message: "Unable to parse timestamp",
+	}
 }
 
 // ScanJSONobject is a split function for a Scanner that returns each JSON object {...} of input stream.
