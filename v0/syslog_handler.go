@@ -36,7 +36,7 @@ var allowedProto = []string{"tcp", "udp", "unix"} //nolint:gochecknoglobals
 // -----------------------------------------------------------------------------
 // SyslogProxy is a type that provides interaction with the syslog Proxyserver
 type SyslogProxy struct {
-	buf                    *bytes.Buffer
+	buf                    io.ReadWriteCloser
 	lineProcessBuf         *bytes.Buffer
 	facility               Facility
 	tag                    string
@@ -56,10 +56,6 @@ type SyslogProxy struct {
 func (s *SyslogProxy) Writer() io.Writer {
 	return s.buf
 }
-
-// func (s *SyslogProxy) LocalBuffer() bufio.ReadWriter {
-// 	return s.buf
-// }
 
 func (s *SyslogProxy) Lock() {
 	s.mu.Lock()
@@ -250,7 +246,7 @@ func NewSyslogProxy(opts *SyslogProxyOptions) (*SyslogProxy, error) {
 	}
 
 	s := &SyslogProxy{
-		buf:                    bytes.NewBuffer(make([]byte, 0, opts.IOBufSize)),
+		buf:                    NewThreadsafeRWC(make([]byte, 0, opts.IOBufSize)),
 		lineProcessBuf:         bytes.NewBuffer(make([]byte, 0, opts.LineProcessBufSize)),
 		facility:               opts.Facility,
 		hostname:               opts.Hostname,
